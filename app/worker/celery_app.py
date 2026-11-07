@@ -1,3 +1,4 @@
+import os
 from celery import Celery
 from app.config import REDIS_URL
 
@@ -15,3 +16,7 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+# Tests : les tâches s'exécutent directement dans le processus (pas besoin de worker)
+if os.getenv("CELERY_TASK_ALWAYS_EAGER") == "1":
+    celery_app.conf.update(task_always_eager=True, task_eager_propagates=True)

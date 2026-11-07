@@ -46,5 +46,10 @@ class AlertResponse(BaseModel):
     status: str
     details: Optional[str] = None
     created_at: datetime
+    peak_risk_score: Optional[float] = None
+    last_risk_score: Optional[float] = None
+    probable_mode: Optional[str] = None
+    model_version: Optional[str] = None
+    closed_at: Optional[datetime] = None
     class Config:
         from_attributes = True

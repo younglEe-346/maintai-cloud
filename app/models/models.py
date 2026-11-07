@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text, Boolean, JSON
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text, Boolean, JSON, Index, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.session import Base
@@ -15,6 +15,11 @@ class Organization(Base):
     password_hash = Column(String, nullable=False)
     plan = Column(String, default="Standard")
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Réglages des alertes (modifiables par le responsable de l'usine)
+    cost_ratio = Column(Float, nullable=False, server_default="50")          # panne manquée / fausse alerte
+    alert_open_k = Column(Integer, nullable=False, server_default="3")       # K mesures hautes d'affilée pour ouvrir
+    alert_close_k = Column(Integer, nullable=False, server_default="3")      # mesures basses d'affilée pour fermer
+    alert_close_factor = Column(Float, nullable=False, server_default="0.5") # seuil bas = facteur x seuil haut
 
     machines = relationship("Machine", back_populates="organization")
     alerts = relationship("Alert", back_populates="organization")
@@ -27,6 +32,9 @@ class Machine(Base):
     api_key = Column(String, unique=True, nullable=False)
     status = Column(String, default="ACTIVE")
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Compteurs de l'hystérésis (mesures consécutives au-dessus / en dessous des seuils)
+    consecutive_high = Column(Integer, nullable=False, server_default="0")
+    consecutive_low = Column(Integer, nullable=False, server_default="0")
 
     organization = relationship("Organization", back_populates="machines")
     telemetries = relationship("Telemetry", back_populates="machine")
@@ -69,10 +77,21 @@ class Alert(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     org_id = Column(String, ForeignKey("organizations.id"), nullable=False)
     machine_id = Column(String, ForeignKey("machines.id"), nullable=False)
-    risk_score = Column(Float, nullable=False)
-    status = Column(String, default="OPEN") # OPEN, CLOSED
+    risk_score = Column(Float, nullable=False)  # risque à l'ouverture
+    status = Column(String, default="OPEN")  # OPEN, ACKNOWLEDGED (acquittée), CLOSED
     details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    peak_risk_score = Column(Float, nullable=True)   # risque maximal pendant l'alerte
+    last_risk_score = Column(Float, nullable=True)   # dernier risque reçu
+    probable_mode = Column(String, nullable=True)
+    model_version = Column(String, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+
+    # Une seule alerte non fermée par machine, garantie par la base elle-même
+    __table_args__ = (
+        Index("uq_alerts_one_active_per_machine", "machine_id", unique=True,
+              postgresql_where=text("status <> 'CLOSED'")),
+    )
 
     organization = relationship("Organization", back_populates="alerts")
     machine = relationship("Machine", back_populates="alerts")

@@ -159,3 +159,86 @@ exactement les mêmes versions de librairies que le worker (scikit-learn figé �
 - TWF est mal prévu ; RNF n'est pas prévisible du tout (c'est voulu par le jeu de données).
 - Les contributions expliquent **le modèle**, pas la physique : sur une ligne isolée,
   la mesure mise en avant peut surprendre.
+
+---
+
+## 3. Alertes
+
+### 3.1 Hystérésis : à quoi ça sert
+Sans hystérésis, une alerte s'ouvrirait à chaque mesure à risque et se fermerait à la
+mesure suivante : le technicien recevrait des dizaines d'alertes pour un seul problème.
+Le sujet demande : **ouverture après K mesures au-dessus du seuil, fermeture sous un
+seuil plus bas, une seule alerte ouverte par machine**.
+
+### 3.2 Comment ça fonctionne
+- **Seuil haut** = le seuil de coût du modèle (calculé pour le ratio de coût de l'usine).
+- **Seuil bas** = `alert_close_factor` × seuil haut (0,5 par défaut).
+- Deux compteurs par machine (`consecutive_high`, `consecutive_low`), gardés **en base**
+  sur la machine : ils continuent d'un lot à l'autre et survivent à un redémarrage.
+
+| Risque de la mesure | Effet |
+|---|---|
+| ≥ seuil haut | compteur haut + 1, compteur bas remis à 0 |
+| < seuil bas | compteur bas + 1, compteur haut remis à 0 |
+| entre les deux (zone morte) | les deux compteurs repartent à 0 |
+
+- Pas d'alerte active et compteur haut ≥ K (`alert_open_k`, 3 par défaut) → **ouverture**.
+- Alerte active et compteur bas ≥ K' (`alert_close_k`, 3 par défaut) → **fermeture**.
+- Pendant l'alerte, on garde le **diagnostic du moment le plus grave** (risque maximal,
+  mode probable, explication).
+
+**Une seule alerte active par machine** est garantie par la base elle-même : un index
+unique partiel `uq_alerts_one_active_per_machine` sur les alertes non fermées. Même si
+deux workers se trompaient, la base refuserait la deuxième alerte. En plus, le worker
+**verrouille la ligne de la machine** (`SELECT … FOR UPDATE`) pendant le traitement
+d'un lot : deux lots de la même machine passent l'un après l'autre.
+
+**Choix à justifier** : le sujet dit « fermeture sous un seuil plus bas ». Nous fermons
+après K' mesures basses d'affilée (et pas une seule), pour qu'une mesure isolée ne
+ferme pas une vraie alerte. Mettre `alert_close_k = 1` suit le sujet à la lettre.
+
+**Test de bout en bout réalisé** (7 lots de vraies lignes AI4I, K = 3) : 2 hautes → rien ;
+3ᵉ haute (dans un autre lot) → ouverture ; encore des hautes → toujours une seule
+alerte ; 3 basses → fermeture ; « H L H H » → rien (le L remet à 0) ; 3ᵉ haute →
+nouvelle alerte.
+
+### 3.3 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/services/hysteresis.py` | la règle, écrite comme une fonction pure (facile à tester) |
+| `app/worker/tasks.py` | applique la règle mesure par mesure, crée / met à jour / ferme l'alerte |
+| `tests/test_hysteresis.py` | 12 tests de la règle |
+
+---
+
+## Annexe A. Base de données et migrations (Alembic)
+
+**À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,
+qui sait créer une table mais **ne modifie jamais une table existante**. Dès qu'on
+ajoute une colonne, les bases déjà créées (la tienne, celles de l'équipe) seraient
+cassées. Alembic enregistre chaque modification du schéma dans un fichier numéroté
+(une *migration*) et sait mettre n'importe quelle base à jour.
+
+**Comment ça fonctionne.**
+- `migrations/versions/0001_schema_initial.py` : le schéma de départ (vérifié identique
+  à la base existante avec `alembic check`).
+- Chaque étape suivante ajoute une migration (`0002_…`, `0003_…`).
+- Le service Docker `migrate` lance `python -m app.db.migrate` à chaque `docker compose up`,
+  **avant** l'API et le worker (`depends_on: service_completed_successfully`).
+- Une base créée avant Alembic est reconnue (tables présentes mais pas de table
+  `alembic_version`) : elle est marquée en version 0001 puis mise à jour.
+- Ajouter une migration après avoir modifié `app/models/models.py` :
+  `alembic revision --autogenerate -m "description"`, puis relire le fichier généré.
+
+**Pourquoi.** C'est l'outil standard avec SQLAlchemy, et chaque changement de schéma
+devient traçable dans Git.
+
+## Annexe B. Vérification avant chaque commit
+
+`bash scripts/verifier.sh` :
+1. `docker compose up -d --build` (toute la plateforme) ;
+2. lance les tests dans l'image Docker (`docker compose --profile tools run --rm --build tests`),
+   sur une base séparée `maintai_test` pour ne jamais toucher aux vraies données ;
+3. vérifie que `migrate` s'est terminé sans erreur et que `api`, `worker`, `postgres`,
+   `redis` tournent ;
+4. vérifie que l'API répond.

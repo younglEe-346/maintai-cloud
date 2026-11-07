@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.session import engine, Base
 from app.api.v1 import auth, machines, telemetry, alerts
 
-# Initialize database tables
-Base.metadata.create_all(bind=engine)
+# Les tables sont créées et mises à jour par Alembic (service "migrate" : python -m app.db.migrate)
 
 app = FastAPI(
     title="MaintAI Cloud API",

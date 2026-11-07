@@ -22,6 +22,17 @@ services:
     ports:
       - "6379:6379"
 
+  # Met la base à jour (migrations Alembic) puis s'arrête ; api et worker attendent sa fin
+  migrate:
+    build: .
+    container_name: maintai_migrate
+    command: python -m app.db.migrate
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: .
     container_name: maintai_api
@@ -33,8 +44,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=supersecretjwtkey_maintai_2026_ensam
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_started
 
@@ -49,8 +60,10 @@ services:
     volumes:
       - ./models:/app/models:ro
     depends_on:
-      - postgres
-      - redis
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
 
   # Entraînement du modèle : docker compose run --rm trainer
   trainer:
@@ -60,6 +73,25 @@ services:
     volumes:
       - ./data:/app/data:ro
       - ./models:/app/models
+
+  # Tests : docker compose --profile tools run --rm --build tests
+  # (base de test séparée maintai_test, Redis base 15, tâches Celery exécutées directement)
+  tests:
+    build: .
+    profiles: ["tools"]
+    command: pytest -q
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_test
+      - REDIS_URL=redis://redis:6379/15
+      - CELERY_TASK_ALWAYS_EAGER=1
+    volumes:
+      - ./data:/app/data:ro
+      - ./models:/app/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   postgres_data:

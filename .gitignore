@@ -8,3 +8,4 @@ __pycache__/
 *.log
 ai4i2020.csv
 org_models/
+simulator/config.json

@@ -699,6 +699,57 @@ C'est l'exploitant de la plateforme, pas un client.
 
 ---
 
+## 11. Simulateur multi-usines
+
+### 11.1 À quoi ça sert
+Le sujet : « simulateur fourni par l'équipe qui rejoue AI4I sur les machines de
+plusieurs usines en même temps ». Il sert à faire la démonstration et à vérifier que
+la plateforme tient la charge et isole bien les usines.
+
+### 11.2 Comment ça fonctionne
+```
+python -m simulator.stream_simulator setup      # crée les usines de démo
+python -m simulator.stream_simulator run --labels --errors 0.02
+python -m simulator.stream_simulator demo       # les deux d'un coup
+```
+- **`setup`** crée 3 usines par l'API, comme un vrai client :
+  Casablanca (**Pro**, 3 machines), Rabat et Tanger (**Gratuit**, 2 machines chacune).
+  Les comptes (e-mail, mot de passe) et les clés des machines (montrées une seule fois)
+  sont enregistrés dans `simulator/config.json` (exclu de Git).
+- **`run`** découpe les 10 000 lignes d'AI4I en tranches consécutives, une par machine,
+  et lance **un thread par machine** : les 7 machines des 3 usines envoient **en même
+  temps**, par lots (`--batch`, défaut 25) espacés de `--delay` secondes.
+- Chaque mesure a un `message_id` unique (`nom de la machine-UDI`).
+- `--labels` ajoute le **retour terrain** (vraies étiquettes AI4I) : il alimente le
+  réentraînement Pro.
+- `--errors 0.02` injecte **volontairement** 2 % de mesures impossibles (couple négatif,
+  900 K…) et quelques doublons, pour montrer la quarantaine et la déduplication.
+- Une machine dont la clé est révoquée (401) ou dont l'usine dépasse son quota (429)
+  s'arrête et l'affiche.
+
+### 11.3 Résultat réel
+Démo sur la plateforme (1 400 lignes, 7 machines en parallèle, retour terrain, 2 %
+d'erreurs) : **1 400 mesures acceptées, 27 doublons détectés, 32 mesures en
+quarantaine**, 40 alertes ouvertes puis fermées (modes PWF, OSF, TWF), chaque usine ne
+voit que ses machines.
+
+### 11.4 Pourquoi ces choix
+- **Passer par l'API publique** (inscription, plan, machines, mesures) : le simulateur
+  teste la plateforme exactement comme un vrai client.
+- **Threads** : l'envoi attend surtout le réseau ; des threads suffisent pour simuler
+  plusieurs machines en même temps, sans complexité.
+- **Aucune donnée inventée** : les mesures sont les vraies lignes AI4I ; seules les
+  erreurs injectées sont fausses, et elles sont faites pour être rejetées.
+
+### 11.5 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `simulator/stream_simulator.py` | `setup`, `run`, `demo` |
+| `simulator/config.json` | comptes et clés de la démo (créé par `setup`, pas dans Git) |
+| `tests/test_simulateur.py` | 4 tests (découpage, erreurs, rejeu de bout en bout) |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

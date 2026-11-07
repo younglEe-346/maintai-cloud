@@ -69,7 +69,8 @@ services:
   worker:
     build: .
     container_name: maintai_worker
-    command: celery -A app.worker.celery_app worker --loglevel=info
+    # 2 processus : chacun charge le modèle en mémoire ; augmenter si beaucoup de machines
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=2
     environment:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
       - REDIS_URL=redis://redis:6379/0

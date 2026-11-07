@@ -655,6 +655,50 @@ ailleurs (Excel, rapport qualité, GMAO).
 
 ---
 
+## 10. Super-administrateur (équipe MaintAI)
+
+### 10.1 À quoi ça sert
+Le sujet : « Super-administrateur : équipe MaintAI ; suit les usines et les workers ».
+C'est l'exploitant de la plateforme, pas un client.
+
+### 10.2 Comment ça fonctionne
+- **Création en ligne de commande, sur le serveur** (aucune route d'inscription) :
+  ```
+  docker compose exec api python -m app.cli create-superadmin --email admin@maintai.local --name "Équipe MaintAI"
+  ```
+  (le mot de passe est demandé au clavier). Il se connecte ensuite normalement
+  (`POST /auth/login`). Son compte n'appartient à **aucune usine** (`is_superadmin = true`).
+- `GET /api/v1/admin/organizations` : pour chaque usine, le plan, le nombre de membres,
+  de machines (et la limite), les mesures du jour (et la limite), les alertes actives,
+  l'heure de la dernière mesure, le modèle utilisé.
+- `PUT /api/v1/admin/organizations/{id}/plan` : change le plan d'une usine (même règle
+  que pour le propriétaire).
+- `GET /api/v1/admin/workers` : les workers Celery qui répondent (`inspect().ping()`),
+  leurs tâches en cours, leur nombre de processus, et le nombre de tâches en attente
+  dans la file Redis.
+
+### 10.3 Pourquoi ces choix
+- **Pas de route pour devenir super-admin** : un tel compte peut tout voir ; il ne doit
+  pouvoir être créé que par quelqu'un qui a déjà accès au serveur.
+- **Des chiffres, pas les données** : le super-admin voit des compteurs, jamais les
+  mesures ni les clés d'une usine. Les routes des usines lui répondent 403 (il n'a pas
+  d'usine). Cela respecte la règle du sujet : une usine ne voit jamais les données d'une
+  autre, et l'exploitant non plus sans raison.
+- **Ce suivi a trouvé un vrai problème** : le worker lançait **20 processus** (un par
+  cœur du processeur), chacun avec son propre exemplaire du modèle en mémoire (environ
+  1 Go au total). Nous l'avons limité à 2 (`--concurrency=2`) : environ 460 Mo. Pour plus
+  de charge, on lance plusieurs conteneurs worker plutôt que des dizaines de processus.
+
+### 10.4 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/cli.py` | commande `create-superadmin` |
+| `app/api/v1/admin.py` | usines, plan, workers |
+| `app/core/deps.py` | `require_superadmin` |
+| `tests/test_superadmin.py` | 6 tests |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

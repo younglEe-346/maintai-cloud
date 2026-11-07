@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr
+
 
 class UserRegister(BaseModel):
     org_name: str
@@ -8,42 +10,31 @@ class UserRegister(BaseModel):
     password: str
     plan: Optional[str] = "Standard"
 
-class UserLogin(BaseModel):
-    username: str
-    password: str
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class MachineCreate(BaseModel):
     name: str
 
+
 class MachineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
     api_key: str
     status: str
     created_at: datetime
-    class Config:
-        from_attributes = True
 
-class TelemetryItem(BaseModel):
-    air_temp: float
-    process_temp: float
-    rotational_speed: float
-    torque: float
-    tool_wear: float
-
-class TelemetryBatchIngest(BaseModel):
-    machine_key: str
-    metrics: List[TelemetryItem]
 
 class AlertResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     machine_id: str
     risk_score: float
-    status: str
+    status: str  # OPEN, ACKNOWLEDGED (acquittée), CLOSED
     details: Optional[str] = None
     created_at: datetime
     peak_risk_score: Optional[float] = None
@@ -51,5 +42,6 @@ class AlertResponse(BaseModel):
     probable_mode: Optional[str] = None
     model_version: Optional[str] = None
     closed_at: Optional[datetime] = None
-    class Config:
-        from_attributes = True
+    acknowledged_at: Optional[datetime] = None
+    acknowledged_by_name: Optional[str] = None
+    ack_comment: Optional[str] = None

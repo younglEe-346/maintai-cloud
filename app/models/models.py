@@ -17,7 +17,7 @@ class Organization(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     # Réglages des alertes (modifiables par le responsable de l'usine)
     cost_ratio = Column(Float, nullable=False, server_default="50")          # panne manquée / fausse alerte
-    alert_open_k = Column(Integer, nullable=False, server_default="3")       # K mesures hautes d'affilée pour ouvrir
+    alert_open_k = Column(Integer, nullable=False, server_default="1")       # K mesures hautes d'affilée pour ouvrir
     alert_close_k = Column(Integer, nullable=False, server_default="3")      # mesures basses d'affilée pour fermer
     alert_close_factor = Column(Float, nullable=False, server_default="0.5") # seuil bas = facteur x seuil haut
 
@@ -109,6 +109,10 @@ class Alert(Base):
     probable_mode = Column(String, nullable=True)
     model_version = Column(String, nullable=True)
     closed_at = Column(DateTime, nullable=True)
+    # Acquittement par un technicien : "je l'ai vue, je m'en occupe"
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by_name = Column(String, nullable=True)
+    ack_comment = Column(Text, nullable=True)
 
     # Une seule alerte non fermée par machine, garantie par la base elle-même
     __table_args__ = (

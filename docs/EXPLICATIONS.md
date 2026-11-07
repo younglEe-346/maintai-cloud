@@ -249,7 +249,7 @@ seuil plus bas, une seule alerte ouverte par machine**.
 | < seuil bas | compteur bas + 1, compteur haut remis à 0 |
 | entre les deux (zone morte) | les deux compteurs repartent à 0 |
 
-- Pas d'alerte active et compteur haut ≥ K (`alert_open_k`, 3 par défaut) → **ouverture**.
+- Pas d'alerte active et compteur haut ≥ K (`alert_open_k`, **1 par défaut**, voir 3.3) → **ouverture**.
 - Alerte active et compteur bas ≥ K' (`alert_close_k`, 3 par défaut) → **fermeture**.
 - Pendant l'alerte, on garde le **diagnostic du moment le plus grave** (risque maximal,
   mode probable, explication).
@@ -264,17 +264,59 @@ d'un lot : deux lots de la même machine passent l'un après l'autre.
 après K' mesures basses d'affilée (et pas une seule), pour qu'une mesure isolée ne
 ferme pas une vraie alerte. Mettre `alert_close_k = 1` suit le sujet à la lettre.
 
-**Test de bout en bout réalisé** (7 lots de vraies lignes AI4I, K = 3) : 2 hautes → rien ;
+**Test de bout en bout réalisé** (7 lots de vraies lignes AI4I, avec K = 3) : 2 hautes → rien ;
 3ᵉ haute (dans un autre lot) → ouverture ; encore des hautes → toujours une seule
 alerte ; 3 basses → fermeture ; « H L H H » → rien (le L remet à 0) ; 3ᵉ haute →
 nouvelle alerte.
 
-### 3.3 Fichiers
+### 3.3 Pourquoi K = 1 par défaut (et pas 3)
+Nous avons rejoué AI4I dans l'ordre du fichier avec les **vraies prédictions
+hors-échantillon** du modèle, puis compté les pannes qui arrivent pendant qu'une alerte
+est active :
+
+| K (ouverture) | Alertes ouvertes | Pannes couvertes par une alerte |
+|---|---|---|
+| **1** | 434 | **327 / 339 (96 %)** |
+| 2 | 128 | 150 / 339 (44 %) |
+| 3 | 67 | 85 / 339 (25 %) |
+
+Raison : AI4I contient des **cycles d'usinage indépendants**, pas une série temporelle
+d'une même machine. Une panne est presque toujours **une seule** mesure à risque,
+entourée de mesures normales. Exiger 3 mesures hautes d'affilée ferait rater 3 pannes
+sur 4. Avec K = 1, l'hystérésis reste utile : une seule alerte par machine, fermeture
+après 3 mesures basses, et 434 alertes au lieu de 1 097 (une par mesure à risque).
+Sur de vraies machines, où une dégradation dure plusieurs mesures, une usine peut
+monter K à 2 ou 3 : c'est un réglage par usine.
+
+### 3.4 Acquittement
+**À quoi ça sert.** Le technicien indique « j'ai vu l'alerte, je m'en occupe », avec son
+nom et un commentaire. Les collègues savent que l'alerte est prise en charge.
+
+**Comment ça fonctionne.** `POST /api/v1/alerts/{id}/acknowledge` avec
+`{"name": "Miloud", "comment": "outil changé"}` :
+- l'alerte passe de `OPEN` à `ACKNOWLEDGED` (« acquittée ») ; on enregistre le nom, le
+  commentaire et l'heure ;
+- une alerte acquittée **reste active** : le risque est toujours là. Elle ne crée pas
+  de deuxième alerte et **se ferme seule** quand le risque redescend (hystérésis) ;
+- acquitter une alerte déjà acquittée ou fermée → erreur **409** (conflit) ;
+- l'alerte d'une autre usine → **404** (on ne révèle pas qu'elle existe).
+
+`GET /api/v1/alerts?status=active` liste les alertes ouvertes ou acquittées ;
+`status=OPEN|ACKNOWLEDGED|CLOSED` filtre un statut précis.
+
+**Pourquoi acquitter ne ferme pas l'alerte ?** Fermer, c'est dire « le risque a
+disparu » : seul le modèle peut le constater avec les nouvelles mesures. Acquitter,
+c'est dire « un humain s'en occupe ». Mélanger les deux ferait disparaître des alertes
+alors que la machine est toujours en danger.
+
+### 3.5 Fichiers
 | Fichier | Rôle |
 |---|---|
 | `app/services/hysteresis.py` | la règle, écrite comme une fonction pure (facile à tester) |
 | `app/worker/tasks.py` | applique la règle mesure par mesure, crée / met à jour / ferme l'alerte |
-| `tests/test_hysteresis.py` | 12 tests de la règle |
+| `app/api/v1/alerts.py` | liste, détail, acquittement |
+| `migrations/versions/0004_…` | colonnes d'acquittement, K = 1 par défaut |
+| `tests/test_hysteresis.py`, `tests/test_alertes.py` | 16 tests (règle + bout en bout par l'API) |
 
 ---
 

@@ -623,6 +623,38 @@ test automatique qui simule un modèle actuel mauvais.
 
 ---
 
+## 9. Export (plan Pro)
+
+### 9.1 À quoi ça sert
+Le plan Pro inclut l'**export** : l'usine récupère ses données pour les analyser
+ailleurs (Excel, rapport qualité, GMAO).
+
+### 9.2 Comment ça fonctionne
+- `GET /api/v1/export/mesures.csv` : chaque mesure avec sa prédiction (risque, décision,
+  seuil, version du modèle, mode probable, explication) et son retour terrain.
+  Filtres optionnels : `machine_id`, `start`, `end` (dates ISO 8601).
+- `GET /api/v1/export/alertes.csv` : toutes les alertes avec leur acquittement.
+- Réservé au plan Pro (**402** sinon) et au propriétaire / administrateur (**403** pour
+  un technicien).
+- Toujours filtré sur l'usine connectée : demander la machine d'une autre usine renvoie
+  un fichier vide.
+
+### 9.3 Pourquoi ces choix
+- **CSV** : le format que tout le monde sait ouvrir.
+- **Séparateur `;` et BOM UTF-8** : Excel en français ouvre le fichier directement, avec
+  les accents corrects (avec `,` il mettrait tout dans une seule colonne).
+- **Envoi en flux** (`StreamingResponse` + `yield_per(1000)`) : les lignes sont lues et
+  envoyées par paquets de 1 000. On peut exporter des centaines de milliers de mesures
+  sans remplir la mémoire du serveur.
+
+### 9.4 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/api/v1/export.py` | les deux exports CSV |
+| `tests/test_export.py` | 6 tests |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,
@@ -650,7 +682,8 @@ devient traçable dans Git.
 `bash scripts/verifier.sh` :
 1. `docker compose up -d --build` (toute la plateforme) ;
 2. lance les tests dans l'image Docker (`docker compose --profile tools run --rm --build tests`),
-   sur une base séparée `maintai_test` pour ne jamais toucher aux vraies données ;
+   sur une base séparée `maintai_test` pour ne jamais toucher aux vraies données
+   (`TESTS=local bash scripts/verifier.sh` : tests avec le venv local, moins de mémoire) ;
 3. vérifie que `migrate` s'est terminé sans erreur et que `api`, `worker`, `postgres`,
    `redis` tournent ;
 4. vérifie que l'API répond.

@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # Vérification avant commit : tests + démarrage complet avec docker compose.
-# Usage : bash scripts/verifier.sh
+# Usage : bash scripts/verifier.sh            (tests dans Docker)
+#         TESTS=local bash scripts/verifier.sh (tests avec le venv local, moins de mémoire)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "== 1. Démarrage : docker compose up --build"
 docker compose up -d --build >/dev/null 2>&1 || { docker compose up -d --build; exit 1; }
 
-echo "== 2. Tests (dans l'image Docker, base de test séparée)"
-docker compose --profile tools run --rm --build tests
+echo "== 2. Tests (base de test séparée maintai_test)"
+if [ "${TESTS:-docker}" = "local" ]; then
+  # mode allégé (moins de mémoire) : pytest avec le venv local, contre postgres/redis de Docker
+  "${PYTHON:-venv/Scripts/python.exe}" -m pytest -q
+else
+  docker compose --profile tools run --rm --build tests
+fi
 
 echo "== 3. Services"
 status=$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' maintai_migrate)

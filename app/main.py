@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, machines, telemetry, alerts, organization, models_api
+from app.api.v1 import auth, machines, telemetry, alerts, organization, models_api, export
 
 # Les tables sont créées et mises à jour par Alembic (service "migrate" : python -m app.db.migrate)
 
@@ -25,6 +25,7 @@ app.include_router(telemetry.router, prefix="/api/v1", tags=["Telemetry"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(organization.router, prefix="/api/v1/org", tags=["Organisation"])
 app.include_router(models_api.router, prefix="/api/v1/org/models", tags=["Modèle IA"])
+app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
 
 @app.get("/")
 def root():

@@ -1,7 +1,5 @@
-"""Utilisation du modèle par le worker (chargé une seule fois par processus)."""
+"""Utilisation d'un modèle par le worker et l'API (chargé une seule fois par processus)."""
 import os
-from functools import lru_cache
-
 import pandas as pd
 
 from app.ml.cost import best_threshold
@@ -20,19 +18,28 @@ def get_artifact() -> dict:
     return _artifact
 
 
-@lru_cache(maxsize=64)
-def threshold_for_ratio(cost_ratio: float) -> float:
-    """Recalcule le seuil optimal pour un autre ratio de coût, à partir des
-    probabilités hors-échantillon sauvegardées avec le modèle (pas de réentraînement)."""
-    a = get_artifact()
-    if cost_ratio == a["cost_ratio"]:
-        return a["threshold"]
-    return best_threshold(a["oof_y"], a["oof_proba"], cost_ratio)["threshold"]
+_threshold_cache: dict = {}
 
 
-def predict_risk(rows: list[dict], cost_ratio: float | None = None) -> list[dict]:
-    a = get_artifact()
-    threshold = a["threshold"] if cost_ratio is None else threshold_for_ratio(float(cost_ratio))
+def threshold_info(a: dict, cost_ratio: float) -> dict:
+    """Seuil optimal pour un ratio de coût, recalculé à partir des probabilités
+    hors-échantillon sauvegardées avec le modèle (pas de réentraînement).
+    Renvoie aussi ce que ce seuil aurait donné sur ces données (rappel, fausses alertes)."""
+    key = (a["name"], float(cost_ratio))
+    if key not in _threshold_cache:
+        info = best_threshold(a["oof_y"], a["oof_proba"], float(cost_ratio))
+        info["evaluated_on"] = int(len(a["oof_y"]))
+        _threshold_cache[key] = info
+    return _threshold_cache[key]
+
+
+def threshold_for_ratio(cost_ratio: float, a: dict | None = None) -> float:
+    return threshold_info(a or get_artifact(), cost_ratio)["threshold"]
+
+
+def predict_risk(rows: list[dict], cost_ratio: float | None = None, artifact: dict | None = None) -> list[dict]:
+    a = artifact or get_artifact()
+    threshold = a["threshold"] if cost_ratio is None else threshold_for_ratio(float(cost_ratio), a)
     X = pd.DataFrame(rows)[RAW_FEATURES]
     proba = a["pipeline"].predict_proba(X)[:, 1]
     modes = predict_modes(a, X)

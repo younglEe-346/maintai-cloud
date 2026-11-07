@@ -502,6 +502,58 @@ Une machine n'a pas d'utilisateur ni de mot de passe : elle s'authentifie avec u
 
 ---
 
+## 7. Coûts et seuils réglables
+
+### 7.1 À quoi ça sert
+Le sujet : « le coût d'une panne manquée change le seuil optimal recalculé ». Une usine
+où une panne coûte très cher (chaîne entière arrêtée) préfère beaucoup de fausses
+alertes ; une petite usine préfère être dérangée moins souvent. Chaque usine règle :
+
+| Réglage | Défaut | Sens |
+|---|---|---|
+| `cost_ratio` | 50 | une panne manquée coûte N fois une fausse alerte |
+| `alert_open_k` | 1 | mesures hautes d'affilée pour ouvrir une alerte |
+| `alert_close_k` | 3 | mesures basses d'affilée pour fermer |
+| `alert_close_factor` | 0,5 | seuil bas = facteur × seuil haut |
+
+### 7.2 Comment ça fonctionne
+- `GET /org/settings` : les réglages, le **seuil haut** et le **seuil bas** calculés, et
+  ce que ce seuil aurait donné sur les 10 000 probabilités hors-échantillon du modèle
+  (pannes détectées, pannes manquées, fausses alertes).
+- `PUT /org/settings` (propriétaire, administrateur) : enregistre et renvoie le
+  **nouveau seuil, recalculé immédiatement**.
+- `GET /org/settings/preview?cost_ratio=10` : aperçu sans enregistrer (pour un curseur
+  dans le tableau de bord).
+- Le recalcul ne réentraîne **rien** : le modèle est sauvegardé avec ses probabilités
+  hors-échantillon (partie 1), on cherche simplement le seuil le moins cher pour le
+  nouveau ratio. Le résultat est mis en cache.
+- Le worker applique le seuil de l'usine à chaque lot, avec le modèle choisi par
+  `app/ml/selection.py`.
+
+| Ratio | 1 | 10 | 50 | 100 | 1 000 |
+|---|---|---|---|---|---|
+| Seuil | 0,375 | 0,227 | 0,022 | 0,005 | 0,002 |
+| Pannes détectées | 82 % | 85 % | 93 % | 97 % | 98 % |
+| Fausses alertes (sur 10 000) | 35 | 74 | 783 | 1 735 | 2 681 |
+
+### 7.3 Pourquoi ces choix
+- **Valeurs contrôlées** (422 sinon) : ratio > 0, K ≥ 1, facteur strictement entre 0 et 1
+  (sinon le seuil bas dépasserait le seuil haut et l'hystérésis n'aurait plus de sens).
+- **Cas limite trouvé et corrigé pendant les tests** : avec un ratio énorme (≥ 5 000),
+  le seuil optimal devient 0 (« alerter sur tout »). La règle d'hystérésis refusait un
+  seuil nul et le worker aurait planté. Elle accepte maintenant ce cas (l'alerte
+  s'ouvre et ne se ferme jamais, ce qui est logique). Un test le vérifie.
+
+### 7.4 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/api/v1/organization.py` | `GET/PUT /org/settings`, `/org/settings/preview` |
+| `app/ml/predictor.py` | `threshold_info` : seuil + effets attendus, mis en cache |
+| `app/ml/selection.py` | quel modèle utilise l'usine |
+| `tests/test_reglages.py` | 11 tests |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

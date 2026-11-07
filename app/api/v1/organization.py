@@ -3,8 +3,8 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.config import FRONTEND_URL, INVITATION_DAYS
@@ -14,6 +14,8 @@ from app.db.session import get_db
 from app.core.plans import PLANS, plan_of
 from app.models.models import Invitation, Machine, Organization, User
 from app.services.usage import measures_today
+from app.ml.predictor import threshold_info
+from app.ml.selection import model_for_org
 from app.services.email import send_email
 
 router = APIRouter()
@@ -167,3 +169,55 @@ def apply_plan(org: Organization, new_plan: str, db: Session) -> None:
             f"Impossible de passer au plan {PLANS[new_plan]['label']} : {machines} machines actives "
             f"pour {limit} autorisées. Archivez d'abord des machines."))
     org.plan = new_plan
+
+
+# ---------- Réglages : coûts et seuils ----------
+
+class SettingsIn(BaseModel):
+    cost_ratio: float = Field(gt=0, le=10_000, description="Coût d'une panne manquée / coût d'une fausse alerte")
+    alert_open_k: int = Field(ge=1, le=50, description="Mesures hautes d'affilée pour ouvrir une alerte")
+    alert_close_k: int = Field(ge=1, le=50, description="Mesures basses d'affilée pour fermer une alerte")
+    alert_close_factor: float = Field(gt=0, lt=1, description="Seuil bas = facteur × seuil haut")
+
+
+def settings_out(org: Organization, db: Session) -> dict:
+    model = model_for_org(org, db)
+    info = threshold_info(model, org.cost_ratio)
+    return {
+        "cost_ratio": org.cost_ratio, "alert_open_k": org.alert_open_k,
+        "alert_close_k": org.alert_close_k, "alert_close_factor": org.alert_close_factor,
+        "model_version": model["name"],
+        "threshold_high": info["threshold"],
+        "threshold_low": info["threshold"] * org.alert_close_factor,
+        # ce que ce seuil aurait donné sur les données hors-échantillon du modèle
+        "expected": {"recall": info["recall"], "precision": info["precision"],
+                     "missed_failures": info["fn"], "false_alarms": info["fp"],
+                     "evaluated_on": info["evaluated_on"]},
+    }
+
+
+@router.get("/settings")
+def get_settings(org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    return settings_out(org, db)
+
+
+@router.put("/settings")
+def update_settings(body: SettingsIn, _: User = Depends(require_roles("owner", "admin")),
+                    org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Le seuil optimal est recalculé tout de suite pour le nouveau ratio de coût ;
+    le worker l'applique aux mesures suivantes."""
+    org.cost_ratio = body.cost_ratio
+    org.alert_open_k, org.alert_close_k = body.alert_open_k, body.alert_close_k
+    org.alert_close_factor = body.alert_close_factor
+    db.commit()
+    return settings_out(org, db)
+
+
+@router.get("/settings/preview")
+def preview_threshold(cost_ratio: float = Query(gt=0, le=10_000),
+                      org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Aperçu sans enregistrer : quel seuil pour ce ratio de coût ?"""
+    model = model_for_org(org, db)
+    info = threshold_info(model, cost_ratio)
+    return {"cost_ratio": cost_ratio, "threshold": info["threshold"], "recall": info["recall"],
+            "precision": info["precision"], "missed_failures": info["fn"], "false_alarms": info["fp"]}

@@ -59,6 +59,11 @@ def test_les_compteurs_continuent_d_un_lot_a_l_autre():
     assert step(c, 0.9, CFG, False) == "open"  # lot 3
 
 
+def test_seuil_nul_alerte_sur_tout_et_ne_ferme_jamais():
+    cfg = HysteresisConfig(high=0.0, low=0.0, open_k=1, close_k=3)
+    assert run([0.0, 0.0, 0.0, 0.0], cfg=cfg) == ["open", None, None, None]
+
+
 @pytest.mark.parametrize("kwargs", [dict(high=0.5, low=0.5), dict(high=0.5, low=0.6),
                                     dict(high=0.5, low=0.2, open_k=0)])
 def test_configuration_invalide_refusee(kwargs):

@@ -15,7 +15,8 @@ class HysteresisConfig:
     close_k: int = 3
 
     def __post_init__(self):
-        if not 0 <= self.low < self.high:
+        # cas limite : seuil haut = 0 ("alerter sur tout", ratio de coût énorme) -> seuil bas = 0
+        if not (0 <= self.low < self.high or self.low == self.high == 0):
             raise ValueError(f"Il faut 0 <= seuil bas < seuil haut (reçu bas={self.low}, haut={self.high})")
         if self.open_k < 1 or self.close_k < 1:
             raise ValueError("open_k et close_k doivent valoir au moins 1")

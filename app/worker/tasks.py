@@ -5,6 +5,7 @@ from app.db.session import SessionLocal
 from app.models.models import Telemetry, Alert, Prediction, Machine, Organization
 from app.ml.features import RAW_FEATURES
 from app.ml.predictor import predict_risk
+from app.ml.selection import model_for_org
 from app.services.hysteresis import Counters, HysteresisConfig, step
 
 
@@ -35,7 +36,7 @@ def process_telemetry_batch_async(machine_id: str, telemetry_ids: list):
             return
 
         # 2. Risque avec le seuil propre au ratio de coût de l'organisation
-        results = predict_risk(metrics, cost_ratio=org.cost_ratio)
+        results = predict_risk(metrics, cost_ratio=org.cost_ratio, artifact=model_for_org(org, db))
         high = results[0]["threshold"]
         cfg = HysteresisConfig(high=high, low=high * org.alert_close_factor,
                                open_k=org.alert_open_k, close_k=org.alert_close_k)

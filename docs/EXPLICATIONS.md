@@ -162,6 +162,73 @@ exactement les mêmes versions de librairies que le worker (scikit-learn figé �
 
 ---
 
+## 2. Réception des mesures (validation, déduplication, quarantaine)
+
+### 2.1 À quoi ça sert
+Les machines envoient leurs mesures par lots : `POST /api/v1/mesures` avec leur clé
+d'API dans l'en-tête `x-api-key`. Le sujet demande de **valider** chaque mesure,
+d'**ignorer les doublons** (même `message_id`) et de **rejeter avec une raison** les
+valeurs physiquement impossibles.
+
+### 2.2 Format d'un lot
+```json
+[
+  {"message_id": "cnc1-000123", "timestamp": "2026-11-07T10:15:00Z",
+   "air_temp": 298.1, "process_temp": 308.6, "rotational_speed": 1551,
+   "torque": 42.8, "tool_wear": 0,
+   "label": {"failure": false, "modes": []}}
+]
+```
+- `message_id` (obligatoire) : identifiant unique donné par la machine.
+- `timestamp` (optionnel) : heure de la mesure ; sinon l'heure de réception.
+- `label` (optionnel) : **retour terrain** (la machine est-elle vraiment tombée en panne,
+  et de quel mode ?). Il ne sert pas à la prédiction, seulement au réentraînement Pro.
+
+### 2.3 Comment ça fonctionne
+1. **Validation**, mesure par mesure (`app/services/validation.py`) :
+   - format : champs présents, nombres, pas de NaN ni d'infini, date valide ;
+   - **bornes physiques** : air 200–400 K, process 200–500 K, vitesse 0–10 000 tr/min,
+     couple 0–500 N·m, usure 0–1 000 min.
+2. Une mesure invalide va en **quarantaine** (table `quarantined_measures`) avec la
+   mesure telle que reçue et la liste des raisons en français. Le reste du lot est
+   quand même accepté. Consultation : `GET /api/v1/quarantaine`.
+3. **Déduplication** : contrainte unique `(machine_id, message_id)` en base et
+   insertion `ON CONFLICT DO NOTHING`. Si une machine renvoie un lot (coupure réseau,
+   nouvel essai), les mesures déjà reçues sont ignorées et signalées dans `duplicates`.
+4. L'API enregistre les mesures acceptées, puis confie au worker le calcul du risque
+   (il reçoit seulement les identifiants des mesures, dans l'ordre d'arrivée).
+
+Réponse (code **202 Accepted** = « reçu, traitement en cours ») :
+```json
+{"accepted": 1, "duplicates": ["cnc1-000122"],
+ "rejected": [{"index": 2, "message_id": "cnc1-000124",
+               "reasons": ["torque = -3 N·m : physiquement impossible (plage acceptée [0 ; 500] N·m)"]}]}
+```
+
+### 2.4 Pourquoi ces choix
+- **Bornes larges** : on ne rejette que l'**impossible**. Une valeur **inhabituelle**
+  (couple de 95 N·m) est acceptée : c'est justement au modèle de la juger dangereuse.
+  Des bornes trop serrées feraient disparaître les mesures les plus intéressantes.
+- **Quarantaine plutôt que suppression** : on garde la preuve de ce qui a été reçu et
+  pourquoi c'est refusé ; le client peut corriger son capteur.
+- **Doublons gérés par la base** (contrainte unique) et pas seulement par le code :
+  même si deux lots identiques arrivent en même temps, la base n'en garde qu'un.
+- **Mesures enregistrées par l'API** (et non plus par le worker) : une mesure reçue
+  est en base même si le worker est arrêté ; elle sera traitée à son redémarrage.
+- **Le même `message_id` sur deux machines différentes** est accepté : l'unicité est
+  par machine.
+
+### 2.5 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/services/validation.py` | format + bornes physiques, raisons en français |
+| `app/api/v1/telemetry.py` | `POST /mesures`, `GET /quarantaine` |
+| `app/api/v1/machines.py` | `GET /machines/{id}/mesures` : mesures + risque + explication |
+| `migrations/versions/0003_…` | colonnes `message_id`, `label_*`, table de quarantaine |
+| `tests/test_validation.py`, `tests/test_mesures.py` | 17 tests |
+
+---
+
 ## 3. Alertes
 
 ### 3.1 Hystérésis : à quoi ça sert

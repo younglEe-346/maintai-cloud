@@ -3,6 +3,7 @@ from datetime import datetime
 from app.worker.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.models.models import Telemetry, Alert, Prediction, Machine, Organization
+from app.ml.features import RAW_FEATURES
 from app.ml.predictor import predict_risk
 from app.services.hysteresis import Counters, HysteresisConfig, step
 
@@ -15,8 +16,9 @@ def alert_details(r: dict) -> str:
 
 
 @celery_app.task
-def process_telemetry_batch_async(machine_id: str, org_id: str, metrics: list):
-    if not metrics:
+def process_telemetry_batch_async(machine_id: str, telemetry_ids: list):
+    """Calcule le risque des mesures déjà enregistrées par l'API (dans l'ordre reçu)."""
+    if not telemetry_ids:
         return
     db = SessionLocal()
     try:
@@ -25,20 +27,12 @@ def process_telemetry_batch_async(machine_id: str, org_id: str, metrics: list):
         machine = db.query(Machine).filter(Machine.id == machine_id).with_for_update().one()
         org = db.get(Organization, machine.org_id)
 
-        # 1. Enregistrer les mesures
-        telemetries = [
-            Telemetry(
-                machine_id=machine_id,
-                air_temp=m["air_temp"],
-                process_temp=m["process_temp"],
-                rotational_speed=m["rotational_speed"],
-                torque=m["torque"],
-                tool_wear=m["tool_wear"],
-            )
-            for m in metrics
-        ]
-        db.add_all(telemetries)
-        db.flush()  # attribue les id des mesures avant de créer les prédictions
+        # 1. Relire les mesures, dans l'ordre d'arrivée
+        by_id = {t.id: t for t in db.query(Telemetry).filter(Telemetry.id.in_(telemetry_ids))}
+        telemetries = [by_id[i] for i in telemetry_ids if i in by_id]
+        metrics = [{f: getattr(t, f) for f in RAW_FEATURES} for t in telemetries]
+        if not telemetries:
+            return
 
         # 2. Risque avec le seuil propre au ratio de coût de l'organisation
         results = predict_risk(metrics, cost_ratio=org.cost_ratio)

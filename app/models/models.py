@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text, Boolean, JSON, Index, text
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text, Boolean, JSON, Index, text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.session import Base
@@ -50,8 +50,31 @@ class Telemetry(Base):
     rotational_speed = Column(Float, nullable=False)
     torque = Column(Float, nullable=False)
     tool_wear = Column(Float, nullable=False)
+    # Identifiant donné par la machine : sert à ignorer un message reçu deux fois
+    message_id = Column(String(128), nullable=True)
+    received_at = Column(DateTime, default=datetime.utcnow)
+    # Retour terrain optionnel (panne constatée + modes) : sert au réentraînement Pro
+    label_failure = Column(Boolean, nullable=True)
+    label_modes = Column(JSON, nullable=True)
 
     machine = relationship("Machine", back_populates="telemetries")
+
+    __table_args__ = (
+        UniqueConstraint("machine_id", "message_id", name="uq_telemetries_machine_message"),
+        Index("ix_telemetries_machine_timestamp", "machine_id", "timestamp"),
+    )
+
+
+class QuarantinedMeasure(Base):
+    """Mesure rejetée (invalide ou physiquement impossible), gardée avec les raisons du rejet."""
+    __tablename__ = "quarantined_measures"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    machine_id = Column(String, ForeignKey("machines.id"), nullable=False)
+    message_id = Column(String(128), nullable=True)
+    payload = Column(JSON, nullable=False)   # la mesure telle que reçue
+    reasons = Column(JSON, nullable=False)   # liste des raisons en français
+    received_at = Column(DateTime, default=datetime.utcnow)
 
 class Prediction(Base):
     """Résultat du modèle pour une mesure, avec la version du modèle qui l'a produit."""

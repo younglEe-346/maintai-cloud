@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_org
 from app.db.session import get_db
 from app.models.models import Machine, Organization, QuarantinedMeasure, Telemetry
+from app.core.plans import plan_of
+from app.services.usage import measures_today, release, seconds_until_reset, try_reserve
 from app.services.validation import MAX_BATCH_SIZE, check_measure, utcnow
 from app.worker.tasks import process_telemetry_batch_async
 
@@ -15,10 +17,31 @@ router = APIRouter()
 
 
 def get_machine_by_key(x_api_key: str = Header(..., alias="x-api-key"), db: Session = Depends(get_db)) -> Machine:
-    machine = db.query(Machine).filter(Machine.api_key == x_api_key).first()
+    machine = db.query(Machine).filter(Machine.api_key == x_api_key, Machine.status == "ACTIVE").first()
     if not machine:
         raise HTTPException(status_code=401, detail="Clé d'API de machine invalide")
     return machine
+
+
+def store_measures(db: Session, machine: Machine, valid: list, now) -> tuple[list, list]:
+    """Insère les mesures ; ON CONFLICT DO NOTHING ignore les message_id déjà reçus.
+    Renvoie (identifiants insérés dans l'ordre reçu, message_id déjà reçus)."""
+    if not valid:
+        return [], []
+    rows = [{
+        "machine_id": machine.id, "message_id": m.message_id,
+        "timestamp": m.timestamp or now, "received_at": now,
+        "air_temp": m.air_temp, "process_temp": m.process_temp,
+        "rotational_speed": m.rotational_speed, "torque": m.torque, "tool_wear": m.tool_wear,
+        "label_failure": m.label.failure if m.label else None,
+        "label_modes": m.label.modes if m.label else None,
+    } for m in valid]
+    stmt = (insert(Telemetry).values(rows)
+            .on_conflict_do_nothing(constraint="uq_telemetries_machine_message")
+            .returning(Telemetry.id, Telemetry.message_id))
+    inserted = {mid: tid for tid, mid in db.execute(stmt).all()}
+    return ([inserted[m.message_id] for m in valid if m.message_id in inserted],
+            [m.message_id for m in valid if m.message_id not in inserted])
 
 
 @router.post("/mesures", status_code=status.HTTP_202_ACCEPTED)
@@ -51,27 +74,31 @@ def ingest_measures(
             seen.add(measure.message_id)
             valid.append(measure)
 
-    # 2. Enregistrement ; un message_id déjà reçu pour cette machine est ignoré (ON CONFLICT)
-    accepted_ids = []
+    # 2. Quota du plan : on réserve les mesures valides dans le compteur du jour
+    org = db.get(Organization, machine.org_id)
+    plan = plan_of(org)
     if valid:
-        rows = [{
-            "machine_id": machine.id, "message_id": m.message_id,
-            "timestamp": m.timestamp or now, "received_at": now,
-            "air_temp": m.air_temp, "process_temp": m.process_temp,
-            "rotational_speed": m.rotational_speed, "torque": m.torque, "tool_wear": m.tool_wear,
-            "label_failure": m.label.failure if m.label else None,
-            "label_modes": m.label.modes if m.label else None,
-        } for m in valid]
-        stmt = (insert(Telemetry).values(rows)
-                .on_conflict_do_nothing(constraint="uq_telemetries_machine_message")
-                .returning(Telemetry.id, Telemetry.message_id))
-        inserted = {mid: tid for tid, mid in db.execute(stmt).all()}
-        accepted_ids = [inserted[m.message_id] for m in valid if m.message_id in inserted]
-        duplicates += [m.message_id for m in valid if m.message_id not in inserted]
+        ok, used = try_reserve(org.id, len(valid), plan["max_measures_per_day"])
+        if not ok:
+            db.rollback()  # rien n'est enregistré, pas même la quarantaine : le lot est à renvoyer
+            raise HTTPException(
+                status_code=429,
+                headers={"Retry-After": str(seconds_until_reset())},
+                detail=(f"Quota journalier du plan {plan['label']} atteint : {used} / "
+                        f"{plan['max_measures_per_day']} mesures aujourd'hui, ce lot en contient "
+                        f"{len(valid)}. Réessayez demain (minuit UTC) ou passez au plan Pro."))
 
-    db.commit()
+    # 3. Enregistrement ; un message_id déjà reçu pour cette machine est ignoré
+    try:
+        accepted_ids, already_received = store_measures(db, machine, valid, now)
+        db.commit()
+    except Exception:
+        release(org.id, len(valid))
+        raise
+    duplicates += already_received
+    release(org.id, len(valid) - len(accepted_ids))  # les doublons ne comptent pas dans le quota
 
-    # 3. Calcul du risque en arrière-plan (dans l'ordre d'arrivée)
+    # 4. Calcul du risque en arrière-plan (dans l'ordre d'arrivée)
     if accepted_ids:
         process_telemetry_batch_async.delay(machine_id=machine.id, telemetry_ids=accepted_ids)
 
@@ -79,6 +106,7 @@ def ingest_measures(
         "accepted": len(accepted_ids),
         "duplicates": duplicates,
         "rejected": rejected,
+        "quota": {"used_today": measures_today(org.id), "limit": plan["max_measures_per_day"]},
     }
 
 

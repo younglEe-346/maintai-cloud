@@ -10,6 +10,8 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@localhost:5432/maintai_test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
+if not os.environ["REDIS_URL"].rstrip("/").endswith("/15"):
+    raise RuntimeError("Les tests doivent utiliser la base Redis 15 (elle est vidée)")
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -29,6 +31,9 @@ def database():
 
     from app.db.migrate import main as migrate
     migrate()
+
+    import redis  # compteurs de quota : base Redis de test vidée
+    redis.Redis.from_url(os.environ["REDIS_URL"]).flushdb()
     yield
 
 

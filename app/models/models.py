@@ -11,7 +11,7 @@ class Organization(Base):
     __tablename__ = "organizations"
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, unique=True, nullable=False)
-    plan = Column(String, default="Standard")
+    plan = Column(String, nullable=False, default="FREE", server_default="FREE")  # FREE ou PRO
     created_at = Column(DateTime, default=datetime.utcnow)
     # Réglages des alertes (modifiables par le responsable de l'usine)
     cost_ratio = Column(Float, nullable=False, server_default="50")          # panne manquée / fausse alerte

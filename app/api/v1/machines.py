@@ -8,6 +8,7 @@ from app.ml.features import RAW_FEATURES
 from app.models.models import Organization, Machine, Telemetry, Prediction
 from app.schemas.schemas import MachineCreate, MachineResponse
 from app.core.deps import get_current_org, require_roles
+from app.core.plans import plan_of
 from app.models.models import User
 
 router = APIRouter()
@@ -19,6 +20,12 @@ def create_machine(
     current_org: Organization = Depends(get_current_org),
     db: Session = Depends(get_db)
 ):
+    plan = plan_of(current_org)
+    active = db.query(Machine).filter(Machine.org_id == current_org.id, Machine.status == "ACTIVE").count()
+    if active >= plan["max_machines"]:
+        raise HTTPException(status_code=402, detail=(
+            f"Limite du plan {plan['label']} atteinte : {plan['max_machines']} machines. "
+            f"Archivez une machine ou passez au plan Pro."))
     api_key = f"maint_{secrets.token_urlsafe(16)}"
     machine = Machine(
         org_id=current_org.id,
@@ -75,3 +82,13 @@ def list_measures(
             }
         out.append(item)
     return out
+
+
+@router.delete("/{machine_id}", status_code=204)
+def archive_machine(machine_id: str, _: User = Depends(require_roles("owner", "admin")),
+                    current_org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Archive la machine : elle n'envoie plus de mesures et libère une place du plan.
+    Son historique (mesures, alertes) est conservé."""
+    machine = get_own_machine(machine_id, current_org, db)
+    machine.status = "ARCHIVED"
+    db.commit()

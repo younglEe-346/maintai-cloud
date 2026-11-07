@@ -403,6 +403,57 @@ champ tapé à la main : on ne peut pas acquitter au nom de quelqu'un d'autre.
 
 ---
 
+## 5. Plans d'abonnement et limites
+
+### 5.1 À quoi ça sert
+Le produit est vendu par abonnement. Le sujet fixe deux plans :
+
+| Plan | Machines | Mesures par jour | Modèle | Export |
+|---|---|---|---|---|
+| Gratuit (`FREE`) | 2 | 10 000 | commun | ❌ |
+| Pro (`PRO`) | 50 | 1 000 000 | réentraîné sur les données de l'usine | ✅ |
+
+### 5.2 Comment ça fonctionne
+- Les limites sont écrites **à un seul endroit** : `app/core/plans.py`.
+- **Machines** : à la création, on compte les machines actives. Au-delà de la limite →
+  **402** (« paiement requis ») avec un message clair. Archiver une machine
+  (`DELETE /machines/{id}`) libère une place : elle n'envoie plus de mesures (401) mais
+  son historique est gardé.
+- **Mesures par jour** : un compteur **Redis** par usine et par jour UTC
+  (`usage:measures:<usine>:<date>`).
+  1. Avant d'enregistrer un lot, on **réserve** ses mesures valides (`INCRBY`).
+  2. Si on dépasse la limite, on annule la réservation et on refuse **tout le lot** :
+     **429** (« trop de requêtes ») avec l'en-tête `Retry-After` (secondes jusqu'à minuit UTC).
+  3. Après l'enregistrement, on **rend** les doublons : ils ne consomment pas de quota.
+  La clé expire seule après 2 jours.
+- **Changer de plan** : `PUT /org/plan {"plan": "PRO"}`, réservé au **propriétaire**.
+  Le paiement est **simulé** (pas de vrai paiement dans ce projet). Repasser en Gratuit
+  est refusé (409) s'il y a plus de 2 machines actives.
+- **Voir sa consommation** : `GET /org` renvoie le plan, les limites, le nombre de
+  machines et de mesures du jour ; chaque réponse de `POST /mesures` contient aussi le quota.
+
+### 5.3 Pourquoi ces choix
+- **Redis pour le compteur** : `INCRBY` est **atomique**. Si deux lots arrivent en même
+  temps, le compteur reste juste, sans verrou. Compter les lignes en base à chaque lot
+  deviendrait lent à 1 million de mesures par jour.
+- **Refuser tout le lot** plutôt qu'en accepter une partie : la machine sait qu'elle
+  doit renvoyer le lot entier plus tard ; pas de lot « à moitié » à reconstituer.
+- **402 pour les machines, 429 pour les mesures** : 402 dit « il faut un plan
+  supérieur », 429 dit « trop pour aujourd'hui, réessayez plus tard ».
+
+### 5.4 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/core/plans.py` | les deux plans et leurs limites |
+| `app/services/usage.py` | compteur Redis du jour |
+| `app/api/v1/telemetry.py` | contrôle du quota à la réception |
+| `app/api/v1/machines.py` | limite de machines, archivage |
+| `app/api/v1/organization.py` | `GET /org`, `PUT /org/plan` |
+| `migrations/versions/0006_…` | anciennes valeurs de plan → `FREE` |
+| `tests/test_plans.py` | 8 tests |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

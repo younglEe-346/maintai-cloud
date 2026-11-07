@@ -11,7 +11,9 @@ from app.config import FRONTEND_URL, INVITATION_DAYS
 from app.core.deps import ROLE_LABELS, get_current_org, get_current_user, require_roles
 from app.core.security import hash_token
 from app.db.session import get_db
-from app.models.models import Invitation, Organization, User
+from app.core.plans import PLANS, plan_of
+from app.models.models import Invitation, Machine, Organization, User
+from app.services.usage import measures_today
 from app.services.email import send_email
 
 router = APIRouter()
@@ -127,7 +129,41 @@ def revoke_invitation(invitation_id: str, me: User = Depends(require_roles("owne
         db.commit()
 
 
+# ---------- Plan et usage ----------
+
+class PlanIn(BaseModel):
+    plan: Literal["FREE", "PRO"]
+
+
+def usage_out(org: Organization, db: Session) -> dict:
+    plan = plan_of(org)
+    machines = db.query(Machine).filter(Machine.org_id == org.id, Machine.status == "ACTIVE").count()
+    return {"plan": org.plan, "plan_label": plan["label"], "limits": plan,
+            "machines": machines, "measures_today": measures_today(org.id)}
+
+
 @router.get("")
-def my_organization(user: User = Depends(get_current_user), org: Organization = Depends(get_current_org)):
-    return {"id": org.id, "name": org.name, "plan": org.plan, "created_at": org.created_at,
-            "my_role": user.role}
+def my_organization(user: User = Depends(get_current_user), org: Organization = Depends(get_current_org),
+                    db: Session = Depends(get_db)):
+    return {"id": org.id, "name": org.name, "created_at": org.created_at, "my_role": user.role,
+            **usage_out(org, db)}
+
+
+@router.put("/plan")
+def change_plan(body: PlanIn, _: User = Depends(require_roles("owner")),
+                org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Changement de plan par le propriétaire (paiement simulé : pas de vrai paiement)."""
+    apply_plan(org, body.plan, db)
+    db.commit()
+    return usage_out(org, db)
+
+
+def apply_plan(org: Organization, new_plan: str, db: Session) -> None:
+    """Règle commune (propriétaire et super-administrateur)."""
+    machines = db.query(Machine).filter(Machine.org_id == org.id, Machine.status == "ACTIVE").count()
+    limit = PLANS[new_plan]["max_machines"]
+    if machines > limit:
+        raise HTTPException(status_code=409, detail=(
+            f"Impossible de passer au plan {PLANS[new_plan]['label']} : {machines} machines actives "
+            f"pour {limit} autorisées. Archivez d'abord des machines."))
+    org.plan = new_plan

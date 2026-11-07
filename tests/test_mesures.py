@@ -13,7 +13,8 @@ def test_lot_valide_accepte_et_risque_calcule(client):
     rows = ai4i_rows([0, 1, 50])  # 2 cycles normaux + 1 vraie panne (PWF)
     r = send(client, machine["api_key"], rows)
     assert r.status_code == 202
-    assert r.json() == {"accepted": 3, "duplicates": [], "rejected": []}
+    body = r.json()
+    assert (body["accepted"], body["duplicates"], body["rejected"]) == (3, [], [])
 
     mesures = client.get(f"{API}/machines/{machine['id']}/mesures", headers=owner["headers"]).json()
     assert len(mesures) == 3

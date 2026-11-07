@@ -10,6 +10,7 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@localhost:5432/maintai_test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
+os.environ.setdefault("SECRET_KEY", "cle-de-test-uniquement-pour-pytest")
 if not os.environ["REDIS_URL"].rstrip("/").endswith("/15"):
     raise RuntimeError("Les tests doivent utiliser la base Redis 15 (elle est vidée)")
 

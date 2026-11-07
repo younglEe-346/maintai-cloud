@@ -792,6 +792,57 @@ L'interface des utilisateurs : http://localhost:8501 (service Docker `dashboard`
 
 ---
 
+## 13. Tests et sécurité
+
+### 13.1 Comment lancer les tests
+```
+bash scripts/verifier.sh               # démarre tout + tests dans Docker (comme l'équipe)
+TESTS=local bash scripts/verifier.sh   # pareil, tests avec le venv local (moins de mémoire)
+docker compose --profile tools run --rm --build tests   # seulement les tests
+```
+**102 tests** (pytest). Les tests d'intégration utilisent une **vraie base PostgreSQL**
+séparée (`maintai_test`, recréée à chaque lancement ; refus de démarrer si le nom ne
+finit pas par `_test`), Redis (base 15) et le **vrai modèle** ; les tâches Celery
+s'exécutent directement dans le processus de test. Les mesures envoyées sont de
+**vraies lignes AI4I**.
+
+### 13.2 Chaque exigence du sujet est testée
+
+| Exigence du sujet | Tests |
+|---|---|
+| Déclarer une machine, clé affichée une seule fois, révocable | `test_cles_api.py` (7) |
+| Lots de mesures : validation, déduplication par `message_id`, rejet motivé | `test_validation.py` (9), `test_mesures.py` (8) |
+| Risque calculé par le worker, enregistré avec la version du modèle | `test_mesures.py`, `test_reentrainement.py` |
+| Seuil qui minimise le coût (ratio 50 modifiable) | `test_cost.py` (3), `test_reglages.py` (11) |
+| Hystérésis, une seule alerte ouverte par machine | `test_hysteresis.py` (13), `test_alertes.py` (3) |
+| Acquittement par un technicien | `test_alertes.py`, `test_roles.py` |
+| Rôles propriétaire / administrateur / membre, invitation par e-mail | `test_roles.py` (12) |
+| Plans Gratuit / Pro et leurs limites | `test_plans.py` (8) |
+| Réentraînement Pro, candidat promu s'il est meilleur | `test_reentrainement.py` (6) |
+| Export (Pro) | `test_export.py` (6) |
+| Super-administrateur : usines et workers | `test_superadmin.py` (6) |
+| Simulateur multi-usines | `test_simulateur.py` (4) |
+| Une usine ne voit jamais les données d'une autre | `test_securite.py` (5) + un test d'isolation dans presque chaque fichier |
+| Tableau de bord | `test_dashboard.py` (1) |
+
+### 13.3 Sécurité : ce qui est en place
+| Risque | Protection |
+|---|---|
+| Lire les données d'une autre usine | filtre systématique sur l'usine de l'utilisateur ; 404 sur les identifiants d'une autre usine (testé route par route) |
+| Vol de la base | mots de passe **bcrypt** ; clés d'API et jetons d'invitation stockés en **SHA-256** uniquement |
+| Jeton falsifié ou expiré | JWT signé avec `SECRET_KEY`, durée limitée (24 h) ; 401 (testé) |
+| Action non autorisée | rôle vérifié par l'API sur chaque route (403), pas seulement caché dans l'interface |
+| Clé secrète dans le code | `SECRET_KEY` lue dans l'environnement (fichier `.env`, jamais commité) ; avertissement si la clé de développement est utilisée |
+| Site web malveillant qui appelle l'API | **CORS** limité à `ALLOWED_ORIGINS` (le tableau de bord) au lieu de `*` (testé) |
+| Données absurdes ou attaque par gros lots | validation, bornes physiques, 1 000 mesures maximum par lot, quotas par plan |
+
+### 13.4 Fichiers
+`tests/` (15 fichiers), `tests/conftest.py` (base de test), `tests/helpers.py`
+(inscription, invitation, envoi de vraies lignes AI4I), `scripts/verifier.sh`,
+`.env.example`.
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

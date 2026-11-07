@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import ALLOWED_ORIGINS
+
 from app.api.v1 import auth, machines, telemetry, alerts, organization, models_api, export, admin
 
 # Les tables sont créées et mises à jour par Alembic (service "migrate" : python -m app.db.migrate)
@@ -11,9 +13,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS : seuls les sites listés dans ALLOWED_ORIGINS peuvent appeler l'API depuis un navigateur
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

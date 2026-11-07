@@ -50,7 +50,8 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=supersecretjwtkey_maintai_2026_ensam
+      - SECRET_KEY=${SECRET_KEY:-dev-only-change-me}   # à définir dans .env en production
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8501}
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
       - FRONTEND_URL=http://localhost:8501
@@ -74,7 +75,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=supersecretjwtkey_maintai_2026_ensam
+      - SECRET_KEY=${SECRET_KEY:-dev-only-change-me}   # à définir dans .env en production
       - ORG_MODELS_DIR=/app/org_models
     volumes:
       - ./models:/app/models:ro

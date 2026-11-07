@@ -2,7 +2,16 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://postgres:postgres@localhost:5432/maintai_db")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-SECRET_KEY = os.getenv("SECRET_KEY", "supersecretjwtkey_maintai_2026_ensam")
+# Clé qui signe les jetons de connexion (JWT). À fournir par l'environnement (.env) en production :
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
+DEV_SECRET_KEY = "dev-only-change-me"
+SECRET_KEY = os.getenv("SECRET_KEY") or DEV_SECRET_KEY
+if SECRET_KEY == DEV_SECRET_KEY:
+    import warnings
+    warnings.warn("SECRET_KEY non définie : clé de développement utilisée (à changer en production)")
+
+# Sites web autorisés à appeler l'API depuis un navigateur (CORS), séparés par des virgules
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8501").split(",") if o.strip()]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

@@ -14,16 +14,35 @@ def uid(prefix: str = "x") -> str:
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
 
-def register(client, plan: str | None = None) -> dict:
-    """Crée une usine ; renvoie {"headers", "email", "password"}."""
+def auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def register(client, full_name: str = "Soulaimane Lbah") -> dict:
+    """Crée une usine et son propriétaire ; renvoie {"headers", "email", "password"}."""
     email, password = f"{uid('owner')}@ensam.ma", "motdepasse123"
-    body = {"org_name": uid("Usine"), "admin_email": email, "password": password}
-    if plan:
-        body["plan"] = plan
+    body = {"org_name": uid("Usine"), "full_name": full_name, "email": email, "password": password}
     r = client.post(f"{API}/auth/register", json=body)
     assert r.status_code == 200, r.text
-    return {"headers": {"Authorization": f"Bearer {r.json()['access_token']}"},
-            "email": email, "password": password}
+    return {"headers": auth(r.json()["access_token"]), "email": email, "password": password}
+
+
+def invite_and_join(client, inviter: dict, role: str = "member", full_name: str = "Jamal Lachguer") -> dict:
+    """Invite un collègue, lit le lien dans l'e-mail envoyé, accepte. Renvoie {"headers", "email"}."""
+    from app.services.email import OUTBOX
+    email = f"{uid(role)}@ensam.ma"
+    r = client.post(f"{API}/org/invitations", json={"email": email, "role": role}, headers=inviter["headers"])
+    assert r.status_code == 201, r.text
+    token = invitation_token(OUTBOX, email)
+    r = client.post(f"{API}/auth/accept-invitation",
+                    json={"token": token, "full_name": full_name, "password": "motdepasse123"})
+    assert r.status_code == 200, r.text
+    return {"headers": auth(r.json()["access_token"]), "email": email}
+
+
+def invitation_token(outbox, email: str) -> str:
+    mail = next(m for m in reversed(outbox) if m["to"] == email)
+    return mail["body"].split("?invitation=")[1].split()[0]
 
 
 def create_machine(client, owner: dict, name: str = "CNC") -> dict:

@@ -11,8 +11,6 @@ class Organization(Base):
     __tablename__ = "organizations"
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, unique=True, nullable=False)
-    admin_email = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=False)
     plan = Column(String, default="Standard")
     created_at = Column(DateTime, default=datetime.utcnow)
     # Réglages des alertes (modifiables par le responsable de l'usine)
@@ -23,6 +21,44 @@ class Organization(Base):
 
     machines = relationship("Machine", back_populates="organization")
     alerts = relationship("Alert", back_populates="organization")
+    users = relationship("User", back_populates="organization")
+
+
+ROLES = ("owner", "admin", "member")  # propriétaire, administrateur, membre (technicien)
+
+
+class User(Base):
+    """Personne qui se connecte. Appartient à une usine avec un rôle.
+    Le super-administrateur (équipe MaintAI) n'appartient à aucune usine."""
+    __tablename__ = "users"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=True, index=True)
+    email = Column(String, unique=True, nullable=False)  # toujours en minuscules
+    full_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, server_default="member")
+    is_superadmin = Column(Boolean, nullable=False, server_default=text("false"))
+    is_active = Column(Boolean, nullable=False, server_default=text("true"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="users")
+
+
+class Invitation(Base):
+    """Invitation d'un collègue par e-mail. Seule l'empreinte (SHA-256) du jeton est stockée."""
+    __tablename__ = "invitations"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    email = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    token_hash = Column(String(64), unique=True, nullable=False)
+    invited_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    organization = relationship("Organization")
 
 class Machine(Base):
     __tablename__ = "machines"
@@ -112,6 +148,7 @@ class Alert(Base):
     # Acquittement par un technicien : "je l'ai vue, je m'en occupe"
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by_name = Column(String, nullable=True)
+    acknowledged_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
     ack_comment = Column(Text, nullable=True)
 
     # Une seule alerte non fermée par machine, garantie par la base elle-même

@@ -30,6 +30,7 @@ chaque décision au technicien.
 | `redis` | file d'attente des tâches Celery |
 | `migrate` | applique les migrations Alembic puis s'arrête |
 | `api` | API REST FastAPI (documentation interactive : http://localhost:8000/docs) |
+| `mailpit` | faux serveur mail de développement (e-mails visibles sur http://localhost:8025) |
 | `worker` | worker Celery : calcule le risque et gère les alertes |
 | `trainer` | (à la demande) entraîne le modèle commun : `docker compose run --rm trainer` |
 
@@ -317,6 +318,88 @@ alors que la machine est toujours en danger.
 | `app/api/v1/alerts.py` | liste, détail, acquittement |
 | `migrations/versions/0004_…` | colonnes d'acquittement, K = 1 par défaut |
 | `tests/test_hysteresis.py`, `tests/test_alertes.py` | 16 tests (règle + bout en bout par l'API) |
+
+---
+
+## 4. Utilisateurs, rôles et invitations
+
+### 4.1 À quoi ça sert
+Le sujet distingue plusieurs personnes dans une usine : le **responsable maintenance**
+(configure machines, coûts, seuils) et le **technicien** (consulte le risque, acquitte
+les alertes). Il demande des **rôles** (propriétaire, administrateur, membre) et
+l'**invitation de collègues par e-mail**.
+
+Avant, le compte *était* l'usine (e-mail et mot de passe sur l'organisation) : une seule
+personne par usine. Maintenant il y a une table `users` : chaque personne a son compte,
+appartient à une usine et a un rôle.
+
+### 4.2 Qui peut faire quoi
+
+| Action | Propriétaire | Administrateur | Membre (technicien) |
+|---|---|---|---|
+| Consulter machines, mesures, alertes, quarantaine | ✅ | ✅ | ✅ |
+| Acquitter une alerte | ✅ | ✅ | ✅ |
+| Déclarer une machine, gérer ses clés | ✅ | ✅ | ❌ |
+| Inviter un membre | ✅ | ✅ | ❌ |
+| Inviter un administrateur | ✅ | ❌ | ❌ |
+| Retirer un membre | ✅ | ✅ | ❌ |
+| Retirer un administrateur, changer un rôle | ✅ | ❌ | ❌ |
+| Changer de plan d'abonnement | ✅ | ❌ | ❌ |
+
+(Le propriétaire = la personne qui a inscrit l'usine. Son rôle ne peut pas être changé
+ni retiré : une usine a toujours un propriétaire.)
+
+### 4.3 Comment ça fonctionne
+- **Inscription** `POST /auth/register` : crée l'usine (plan Gratuit) + son propriétaire.
+- **Connexion** `POST /auth/login` : renvoie un **jeton JWT** signé qui contient
+  l'identifiant de l'utilisateur. Chaque requête l'envoie dans
+  `Authorization: Bearer …`. Le serveur vérifie la signature et retrouve l'utilisateur.
+- **Contrôle des droits** dans `app/core/deps.py` : chaque route déclare ce qu'elle
+  exige, par exemple `Depends(require_roles("owner", "admin"))`. Un rôle insuffisant
+  → **403**. Pas de jeton ou jeton invalide → **401**.
+- **Isolation des usines** : toutes les requêtes filtrent sur l'usine de l'utilisateur
+  connecté. Une ressource d'une autre usine répond **404** (on ne révèle même pas
+  qu'elle existe).
+- **Mots de passe** hachés avec **bcrypt** (lent exprès : difficile à casser), 8
+  caractères minimum.
+
+**Invitation, étape par étape :**
+1. `POST /org/invitations {"email", "role"}` : on crée un **jeton aléatoire** de 256 bits.
+   En base on ne stocke que son **empreinte SHA-256** : quelqu'un qui lirait la base ne
+   pourrait pas utiliser les invitations.
+2. Un e-mail part avec le lien `http://localhost:8501/?invitation=<jeton>` (valable 7 jours).
+   En développement, **Mailpit** reçoit l'e-mail : on le lit sur http://localhost:8025.
+3. Le collègue ouvre le lien ; `GET /auth/invitations/{jeton}` affiche l'usine et le rôle.
+4. `POST /auth/accept-invitation {"token", "full_name", "password"}` crée son compte.
+   Le lien ne sert qu'**une fois** (409 ensuite), expire (410) et peut être annulé (404).
+
+**Retirer un membre** : son compte est **désactivé** (pas supprimé), pour garder
+l'historique (par exemple « alerte acquittée par Miloud »). Son jeton ne marche plus (401).
+
+**Acquittement** : le nom enregistré vient maintenant **du compte connecté**, pas d'un
+champ tapé à la main : on ne peut pas acquitter au nom de quelqu'un d'autre.
+
+### 4.4 Pourquoi ces choix
+- **JWT** : l'API n'a pas besoin de garder les sessions en mémoire ; plusieurs
+  instances de l'API peuvent vérifier le même jeton.
+- **SHA-256 pour le jeton d'invitation, bcrypt pour le mot de passe** : un mot de passe
+  humain est court et devinable, il faut un hachage lent (bcrypt). Un jeton aléatoire
+  de 256 bits est impossible à deviner : un hachage rapide suffit et permet de le
+  retrouver directement en base.
+- **Mailpit** : de vrais e-mails SMTP, visibles dans un navigateur, sans risque d'en
+  envoyer à de vraies personnes. En production, il suffit de changer `SMTP_HOST`.
+- **Migration sans perte** (0005) : chaque usine existante garde son compte, transformé
+  en utilisateur propriétaire.
+
+### 4.5 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/core/deps.py` | utilisateur connecté, usine, contrôle des rôles |
+| `app/api/v1/auth.py` | inscription, connexion, `/me`, acceptation d'invitation |
+| `app/api/v1/organization.py` | membres, rôles, invitations |
+| `app/services/email.py` | envoi SMTP (Mailpit en développement) |
+| `migrations/versions/0005_…` | tables `users` et `invitations`, reprise des comptes existants |
+| `tests/test_roles.py` | 12 tests (droits, invitation, expiration, isolation) |
 
 ---
 

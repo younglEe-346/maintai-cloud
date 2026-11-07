@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.v1.auth import get_current_org
+from app.core.deps import get_current_org, get_current_user
 from app.db.session import get_db
-from app.models.models import Alert, Organization
+from app.models.models import Alert, Organization, User
 from app.schemas.schemas import AlertResponse
 
 router = APIRouter()
@@ -17,7 +17,6 @@ ACTIVE = ("OPEN", "ACKNOWLEDGED")
 
 
 class AcknowledgeIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100, description="Nom du technicien")
     comment: str = Field(default="", max_length=2000)
 
 
@@ -57,6 +56,7 @@ def get_alert(alert_id: str, current_org: Organization = Depends(get_current_org
 def acknowledge_alert(
     alert_id: str,
     body: AcknowledgeIn,
+    user: User = Depends(get_current_user),
     current_org: Organization = Depends(get_current_org),
     db: Session = Depends(get_db),
 ):
@@ -70,7 +70,8 @@ def acknowledge_alert(
                             detail=f"Alerte déjà acquittée par {alert.acknowledged_by_name}")
     alert.status = "ACKNOWLEDGED"
     alert.acknowledged_at = datetime.utcnow()
-    alert.acknowledged_by_name = body.name.strip()
+    alert.acknowledged_by_name = user.full_name  # le nom vient du compte connecté
+    alert.acknowledged_by_user_id = user.id
     alert.ack_comment = body.comment.strip() or None
     db.commit()
     db.refresh(alert)

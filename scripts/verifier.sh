@@ -14,7 +14,7 @@ echo "== 3. Services"
 status=$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' maintai_migrate)
 [ "$status" = "exited 0" ] || { echo "ÉCHEC : migrate = $status"; docker compose logs migrate | tail -20; exit 1; }
 echo "migrate : terminé sans erreur"
-for c in maintai_api maintai_worker maintai_postgres maintai_redis; do
+for c in maintai_api maintai_worker maintai_postgres maintai_redis maintai_mailpit; do
   s=$(docker inspect -f '{{.State.Status}}' "$c")
   [ "$s" = "running" ] || { echo "ÉCHEC : $c = $s"; docker logs "$c" 2>&1 | tail -20; exit 1; }
   echo "$c : running"

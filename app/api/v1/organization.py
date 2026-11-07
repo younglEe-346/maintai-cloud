@@ -1,0 +1,133 @@
+"""Mon usine : membres, rôles, invitations de collègues par e-mail."""
+import secrets
+from datetime import datetime, timedelta
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
+
+from app.config import FRONTEND_URL, INVITATION_DAYS
+from app.core.deps import ROLE_LABELS, get_current_org, get_current_user, require_roles
+from app.core.security import hash_token
+from app.db.session import get_db
+from app.models.models import Invitation, Organization, User
+from app.services.email import send_email
+
+router = APIRouter()
+
+
+class InvitationIn(BaseModel):
+    email: EmailStr
+    role: Literal["admin", "member"] = "member"
+
+
+class RoleIn(BaseModel):
+    role: Literal["admin", "member"]
+
+
+def member_out(u: User) -> dict:
+    return {"id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role,
+            "created_at": u.created_at}
+
+
+def invitation_out(i: Invitation) -> dict:
+    return {"id": i.id, "email": i.email, "role": i.role, "created_at": i.created_at,
+            "expires_at": i.expires_at, "accepted_at": i.accepted_at, "revoked_at": i.revoked_at}
+
+
+def get_member(user_id: str, org: Organization, db: Session) -> User:
+    u = db.query(User).filter(User.id == user_id, User.org_id == org.id, User.is_active.is_(True)).first()
+    if u is None:
+        raise HTTPException(status_code=404, detail="Membre introuvable")
+    return u
+
+
+# ---------- Membres ----------
+
+@router.get("/members")
+def list_members(org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    users = (db.query(User).filter(User.org_id == org.id, User.is_active.is_(True))
+             .order_by(User.created_at).all())
+    return [member_out(u) for u in users]
+
+
+@router.patch("/members/{user_id}")
+def change_role(user_id: str, body: RoleIn,
+                me: User = Depends(require_roles("owner")),
+                org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Seul le propriétaire change les rôles. Le rôle de propriétaire ne se change pas ici."""
+    u = get_member(user_id, org, db)
+    if u.role == "owner":
+        raise HTTPException(status_code=400, detail="Le rôle du propriétaire ne peut pas être modifié")
+    u.role = body.role
+    db.commit()
+    return member_out(u)
+
+
+@router.delete("/members/{user_id}", status_code=204)
+def remove_member(user_id: str, me: User = Depends(require_roles("owner", "admin")),
+                  org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Retire un membre de l'usine (son compte est désactivé, l'historique est gardé)."""
+    u = get_member(user_id, org, db)
+    if u.role == "owner":
+        raise HTTPException(status_code=400, detail="Le propriétaire ne peut pas être retiré")
+    if u.role == "admin" and me.role != "owner":
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut retirer un administrateur")
+    u.is_active = False
+    db.commit()
+
+
+# ---------- Invitations ----------
+
+@router.post("/invitations", status_code=201)
+def invite(body: InvitationIn, me: User = Depends(require_roles("owner", "admin")),
+           org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    if body.role == "admin" and me.role != "owner":
+        raise HTTPException(status_code=403, detail="Seul le propriétaire peut inviter un administrateur")
+    email = body.email.lower()
+    existing = db.query(User).filter(User.email == email).first()
+    if existing is not None and existing.is_active:
+        raise HTTPException(status_code=409, detail="Un compte existe déjà avec cet e-mail")
+
+    token = secrets.token_urlsafe(32)  # envoyé par e-mail, jamais stocké en clair
+    inv = Invitation(org_id=org.id, email=email, role=body.role, token_hash=hash_token(token),
+                     invited_by_user_id=me.id,
+                     expires_at=datetime.utcnow() + timedelta(days=INVITATION_DAYS))
+    db.add(inv)
+    db.commit()
+
+    link = f"{FRONTEND_URL}/?invitation={token}"
+    sent = send_email(
+        to=email,
+        subject=f"Invitation à rejoindre {org.name} sur MaintAI Cloud",
+        body=(f"Bonjour,\n\n{me.full_name} vous invite à rejoindre l'usine « {org.name} » sur "
+              f"MaintAI Cloud en tant que {ROLE_LABELS[body.role]}.\n\n"
+              f"Pour accepter, ouvrez ce lien (valable {INVITATION_DAYS} jours) :\n{link}\n\n"
+              f"Si vous n'attendiez pas cette invitation, ignorez cet e-mail."),
+    )
+    return {**invitation_out(inv), "email_sent": sent}
+
+
+@router.get("/invitations")
+def list_invitations(me: User = Depends(require_roles("owner", "admin")),
+                     org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    rows = db.query(Invitation).filter(Invitation.org_id == org.id).order_by(Invitation.created_at.desc())
+    return [invitation_out(i) for i in rows]
+
+
+@router.delete("/invitations/{invitation_id}", status_code=204)
+def revoke_invitation(invitation_id: str, me: User = Depends(require_roles("owner", "admin")),
+                      org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    inv = db.query(Invitation).filter(Invitation.id == invitation_id, Invitation.org_id == org.id).first()
+    if inv is None:
+        raise HTTPException(status_code=404, detail="Invitation introuvable")
+    if inv.accepted_at is None and inv.revoked_at is None:
+        inv.revoked_at = datetime.utcnow()
+        db.commit()
+
+
+@router.get("")
+def my_organization(user: User = Depends(get_current_user), org: Organization = Depends(get_current_org)):
+    return {"id": org.id, "name": org.name, "plan": org.plan, "created_at": org.created_at,
+            "my_role": user.role}

@@ -7,13 +7,15 @@ from app.db.session import get_db
 from app.ml.features import RAW_FEATURES
 from app.models.models import Organization, Machine, Telemetry, Prediction
 from app.schemas.schemas import MachineCreate, MachineResponse
-from app.api.v1.auth import get_current_org
+from app.core.deps import get_current_org, require_roles
+from app.models.models import User
 
 router = APIRouter()
 
 @router.post("", response_model=MachineResponse)
 def create_machine(
     machine_in: MachineCreate,
+    _: User = Depends(require_roles("owner", "admin")),
     current_org: Organization = Depends(get_current_org),
     db: Session = Depends(get_db)
 ):

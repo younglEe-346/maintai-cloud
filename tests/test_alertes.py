@@ -1,5 +1,5 @@
 """Alertes de bout en bout : hystérésis réelle (worker), acquittement, isolation."""
-from helpers import API, ai4i_rows, create_machine, register, send
+from helpers import API, ai4i_rows, create_machine, invite_and_join, register, send
 
 NORMAUX = [0, 1, 2, 3]  # cycles normaux AI4I : risque ~0
 
@@ -32,15 +32,16 @@ def test_acquittement(client):
     send(client, m["api_key"], ai4i_rows([50]))
     alert_id = alerts(client, owner, status="active")[0]["id"]
 
-    r = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"],
-                    json={"name": "Miloud", "comment": "Couple anormal, outil changé"})
+    tech = invite_and_join(client, owner, "member", full_name="Miloud Oujakka")
+    r = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=tech["headers"],
+                    json={"comment": "Couple anormal, outil changé"})
     assert r.status_code == 200
     a = r.json()
-    assert a["status"] == "ACKNOWLEDGED" and a["acknowledged_by_name"] == "Miloud"
+    assert a["status"] == "ACKNOWLEDGED" and a["acknowledged_by_name"] == "Miloud Oujakka"
     assert a["ack_comment"] == "Couple anormal, outil changé" and a["acknowledged_at"]
 
     # deuxième acquittement refusé
-    again = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"], json={"name": "X"})
+    again = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"], json={})
     assert again.status_code == 409
 
     # une alerte acquittée reste active : pas de nouvelle alerte si le risque reste haut
@@ -50,17 +51,8 @@ def test_acquittement(client):
     # elle se ferme quand le risque redescend
     send(client, m["api_key"], ai4i_rows(NORMAUX[:3]))
     assert client.get(f"{API}/alerts/{alert_id}", headers=owner["headers"]).json()["status"] == "CLOSED"
-    closed = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"], json={"name": "X"})
+    closed = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"], json={})
     assert closed.status_code == 409
-
-
-def test_acquittement_nom_obligatoire(client):
-    owner = register(client)
-    m = create_machine(client, owner)
-    send(client, m["api_key"], ai4i_rows([50]))
-    alert_id = alerts(client, owner, status="active")[0]["id"]
-    r = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=owner["headers"], json={"name": ""})
-    assert r.status_code == 422
 
 
 def test_une_usine_ne_voit_pas_les_alertes_d_une_autre(client):
@@ -70,5 +62,5 @@ def test_une_usine_ne_voit_pas_les_alertes_d_une_autre(client):
     alert_id = alerts(client, a, status="active")[0]["id"]
     assert alerts(client, b) == []
     assert client.get(f"{API}/alerts/{alert_id}", headers=b["headers"]).status_code == 404
-    r = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=b["headers"], json={"name": "intrus"})
+    r = client.post(f"{API}/alerts/{alert_id}/acknowledge", headers=b["headers"], json={})
     assert r.status_code == 404

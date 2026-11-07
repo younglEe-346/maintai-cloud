@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.api.v1.auth import get_current_org
+from app.core.deps import get_current_org
 from app.db.session import get_db
 from app.models.models import Machine, Organization, QuarantinedMeasure, Telemetry
 from app.services.validation import MAX_BATCH_SIZE, check_measure, utcnow

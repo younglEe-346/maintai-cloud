@@ -1,14 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr
-
-
-class UserRegister(BaseModel):
-    org_name: str
-    admin_email: EmailStr
-    password: str
-    plan: Optional[str] = "Standard"
+from pydantic import BaseModel, ConfigDict
 
 
 class Token(BaseModel):

@@ -454,6 +454,54 @@ Le produit est vendu par abonnement. Le sujet fixe deux plans :
 
 ---
 
+## 6. Clés d'API des machines (hachées, montrées une fois, révocables)
+
+### 6.1 À quoi ça sert
+Une machine n'a pas d'utilisateur ni de mot de passe : elle s'authentifie avec une
+**clé d'API** envoyée dans l'en-tête `x-api-key`. Le sujet demande une clé par machine,
+**affichée une seule fois** et **révocable**.
+
+### 6.2 Comment ça fonctionne
+- **Création** (`POST /machines`) : on génère une clé aléatoire de 192 bits
+  (`maint_…`). La réponse la contient **une seule fois**, avec l'avertissement
+  « Copiez cette clé maintenant ». En base, on ne garde que :
+  - son **empreinte SHA-256** (`api_key_hash`) ;
+  - ses 12 premiers caractères (`api_key_prefix`), pour reconnaître la clé dans la liste.
+- **Réception des mesures** : on calcule l'empreinte de la clé reçue et on cherche la
+  machine qui a cette empreinte. Clé inconnue, révoquée ou machine archivée → **401**.
+- **Révoquer** (`POST /machines/{id}/api-key/revoke`) : par exemple si le boîtier de la
+  machine est volé. Les mesures envoyées avec cette clé sont refusées.
+- **Remplacer** (`POST /machines/{id}/api-key/rotate`) : nouvelle clé montrée une fois,
+  l'ancienne cesse immédiatement de fonctionner.
+- Seuls le propriétaire et l'administrateur gèrent les clés (le technicien : 403).
+
+### 6.3 Pourquoi ces choix
+- **Ne jamais stocker la clé en clair** : si la base fuit (sauvegarde perdue, injection
+  SQL…), l'attaquant ne peut pas se faire passer pour les machines. C'est le même
+  principe que pour les mots de passe.
+- **SHA-256 et pas bcrypt** : bcrypt est lent exprès, utile pour des mots de passe
+  humains faciles à deviner. Une clé aléatoire de 192 bits est impossible à deviner :
+  SHA-256 suffit, et comme il donne toujours la même empreinte pour la même clé, on
+  retrouve la machine **directement par index** (bcrypt obligerait à tester chaque machine).
+- **Montrée une fois** : c'est la conséquence logique : on ne peut pas réafficher une
+  clé qu'on ne connaît plus. On en génère une nouvelle si elle est perdue.
+- **Migration 0007** : les clés existantes sont hachées **dans PostgreSQL**
+  (`sha256()`), puis la colonne en clair est supprimée. Nous avons vérifié que
+  PostgreSQL et Python donnent la même empreinte, et qu'une machine existante continue
+  d'envoyer ses mesures après la migration. Cette migration est **irréversible** :
+  on ne peut pas retrouver une clé à partir de son empreinte.
+
+### 6.4 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/api/v1/machines.py` | création, liste, révocation, remplacement |
+| `app/api/v1/telemetry.py` | authentification de la machine par empreinte |
+| `app/core/security.py` | `hash_token` (SHA-256) |
+| `migrations/versions/0007_…` | hachage des clés existantes |
+| `tests/test_cles_api.py` | 7 tests |
+
+---
+
 ## Annexe A. Base de données et migrations (Alembic)
 
 **À quoi ça sert.** Au début, les tables étaient créées par `Base.metadata.create_all`,

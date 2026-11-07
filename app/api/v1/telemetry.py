@@ -9,6 +9,7 @@ from app.core.deps import get_current_org
 from app.db.session import get_db
 from app.models.models import Machine, Organization, QuarantinedMeasure, Telemetry
 from app.core.plans import plan_of
+from app.core.security import hash_token
 from app.services.usage import measures_today, release, seconds_until_reset, try_reserve
 from app.services.validation import MAX_BATCH_SIZE, check_measure, utcnow
 from app.worker.tasks import process_telemetry_batch_async
@@ -17,9 +18,10 @@ router = APIRouter()
 
 
 def get_machine_by_key(x_api_key: str = Header(..., alias="x-api-key"), db: Session = Depends(get_db)) -> Machine:
-    machine = db.query(Machine).filter(Machine.api_key == x_api_key, Machine.status == "ACTIVE").first()
-    if not machine:
-        raise HTTPException(status_code=401, detail="Clé d'API de machine invalide")
+    # on compare les empreintes : la clé en clair n'est jamais stockée
+    machine = db.query(Machine).filter(Machine.api_key_hash == hash_token(x_api_key)).first()
+    if machine is None or machine.api_key_revoked_at is not None or machine.status != "ACTIVE":
+        raise HTTPException(status_code=401, detail="Clé d'API de machine invalide, révoquée ou machine archivée")
     return machine
 
 

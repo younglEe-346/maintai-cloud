@@ -1,24 +1,44 @@
+"""Machines de l'usine et leurs clés d'API."""
 import secrets
+from datetime import datetime
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.ml.features import RAW_FEATURES
-from app.models.models import Organization, Machine, Telemetry, Prediction
-from app.schemas.schemas import MachineCreate, MachineResponse
 from app.core.deps import get_current_org, require_roles
 from app.core.plans import plan_of
-from app.models.models import User
+from app.core.security import hash_token
+from app.db.session import get_db
+from app.ml.features import RAW_FEATURES
+from app.models.models import Machine, Organization, Prediction, Telemetry, User
+from app.schemas.schemas import MachineCreate, MachineResponse, MachineWithKey
 
 router = APIRouter()
 
-@router.post("", response_model=MachineResponse)
+KEY_WARNING = "Copiez cette clé maintenant : elle ne sera plus jamais affichée."
+
+
+def new_api_key(machine: Machine) -> str:
+    """Génère une clé (192 bits aléatoires) ; seule son empreinte est gardée."""
+    key = f"maint_{secrets.token_urlsafe(24)}"
+    machine.api_key_hash = hash_token(key)
+    machine.api_key_prefix = key[:12]
+    machine.api_key_created_at = datetime.utcnow()
+    machine.api_key_revoked_at = None
+    return key
+
+
+def with_key(machine: Machine, key: str) -> dict:
+    return {**MachineResponse.model_validate(machine).model_dump(), "api_key": key, "warning": KEY_WARNING}
+
+
+@router.post("", response_model=MachineWithKey, status_code=201)
 def create_machine(
     machine_in: MachineCreate,
     _: User = Depends(require_roles("owner", "admin")),
     current_org: Organization = Depends(get_current_org),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     plan = plan_of(current_org)
     active = db.query(Machine).filter(Machine.org_id == current_org.id, Machine.status == "ACTIVE").count()
@@ -26,23 +46,18 @@ def create_machine(
         raise HTTPException(status_code=402, detail=(
             f"Limite du plan {plan['label']} atteinte : {plan['max_machines']} machines. "
             f"Archivez une machine ou passez au plan Pro."))
-    api_key = f"maint_{secrets.token_urlsafe(16)}"
-    machine = Machine(
-        org_id=current_org.id,
-        name=machine_in.name,
-        api_key=api_key
-    )
+    machine = Machine(org_id=current_org.id, name=machine_in.name)
+    key = new_api_key(machine)
     db.add(machine)
     db.commit()
     db.refresh(machine)
-    return machine
+    return with_key(machine, key)
+
 
 @router.get("", response_model=List[MachineResponse])
-def list_machines(
-    current_org: Organization = Depends(get_current_org),
-    db: Session = Depends(get_db)
-):
-    return db.query(Machine).filter(Machine.org_id == current_org.id).all()
+def list_machines(current_org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Liste des machines : la clé n'apparaît jamais, seulement son début (préfixe)."""
+    return db.query(Machine).filter(Machine.org_id == current_org.id).order_by(Machine.created_at).all()
 
 
 def get_own_machine(machine_id: str, org: Organization, db: Session) -> Machine:
@@ -92,3 +107,27 @@ def archive_machine(machine_id: str, _: User = Depends(require_roles("owner", "a
     machine = get_own_machine(machine_id, current_org, db)
     machine.status = "ARCHIVED"
     db.commit()
+
+
+@router.post("/{machine_id}/api-key/revoke", response_model=MachineResponse)
+def revoke_api_key(machine_id: str, _: User = Depends(require_roles("owner", "admin")),
+                   current_org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Révoque la clé (ex. boîtier volé) : les mesures envoyées avec elle sont refusées (401)."""
+    machine = get_own_machine(machine_id, current_org, db)
+    if machine.api_key_revoked_at is None:
+        machine.api_key_revoked_at = datetime.utcnow()
+        db.commit()
+    return machine
+
+
+@router.post("/{machine_id}/api-key/rotate", response_model=MachineWithKey)
+def rotate_api_key(machine_id: str, _: User = Depends(require_roles("owner", "admin")),
+                   current_org: Organization = Depends(get_current_org), db: Session = Depends(get_db)):
+    """Remplace la clé : l'ancienne cesse de fonctionner, la nouvelle est montrée une seule fois."""
+    machine = get_own_machine(machine_id, current_org, db)
+    if machine.status != "ACTIVE":
+        raise HTTPException(status_code=409, detail="Machine archivée")
+    key = new_api_key(machine)
+    db.commit()
+    db.refresh(machine)
+    return with_key(machine, key)

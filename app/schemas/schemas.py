@@ -14,12 +14,21 @@ class MachineCreate(BaseModel):
 
 
 class MachineResponse(BaseModel):
+    """Machine telle que listée : jamais la clé, seulement son préfixe."""
     model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
-    api_key: str
     status: str
     created_at: datetime
+    api_key_prefix: str
+    api_key_created_at: Optional[datetime] = None
+    api_key_revoked_at: Optional[datetime] = None
+
+
+class MachineWithKey(MachineResponse):
+    """Réponse de création / remplacement de clé : la seule fois où la clé est montrée."""
+    api_key: str
+    warning: str
 
 
 class AlertResponse(BaseModel):

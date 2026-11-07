@@ -65,8 +65,12 @@ class Machine(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     org_id = Column(String, ForeignKey("organizations.id"), nullable=False)
     name = Column(String, nullable=False)
-    api_key = Column(String, unique=True, nullable=False)
-    status = Column(String, default="ACTIVE")
+    # Clé d'API : seule son empreinte SHA-256 est stockée ; la clé n'est montrée qu'une fois
+    api_key_hash = Column(String(64), unique=True, nullable=False)
+    api_key_prefix = Column(String(16), nullable=False)       # début de la clé, pour la reconnaître
+    api_key_created_at = Column(DateTime, nullable=True)
+    api_key_revoked_at = Column(DateTime, nullable=True)       # clé révoquée : mesures refusées
+    status = Column(String, default="ACTIVE")  # ACTIVE ou ARCHIVED
     created_at = Column(DateTime, default=datetime.utcnow)
     # Compteurs de l'hystérésis (mesures consécutives au-dessus / en dessous des seuils)
     consecutive_high = Column(Integer, nullable=False, server_default="0")

@@ -12,3 +12,6 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))
 SMTP_FROM = os.getenv("SMTP_FROM", "MaintAI Cloud <noreply@maintai.local>")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8501")
 INVITATION_DAYS = int(os.getenv("INVITATION_DAYS", "7"))
+
+# Modèles réentraînés par usine (plan Pro) : un sous-dossier par usine
+ORG_MODELS_DIR = os.getenv("ORG_MODELS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "org_models"))

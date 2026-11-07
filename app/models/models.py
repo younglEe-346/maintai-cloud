@@ -163,3 +163,27 @@ class Alert(Base):
 
     organization = relationship("Organization", back_populates="alerts")
     machine = relationship("Machine", back_populates="alerts")
+
+
+class OrgModel(Base):
+    """Modèle réentraîné sur les données d'UNE usine (plan Pro).
+    Statuts : training -> active (promu) | rejected (pas meilleur) | failed (erreur, pas assez de données).
+    Un ancien modèle actif remplacé passe à retired."""
+    __tablename__ = "org_models"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False, server_default="training")
+    path = Column(String, nullable=True)        # fichier joblib (seulement si promu)
+    metrics = Column(JSON, nullable=True)       # comparaison candidat / modèle actuel
+    message = Column(Text, nullable=True)       # explication lisible du résultat
+    requested_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("org_id", "version", name="uq_org_models_org_version"),
+        # un seul modèle actif par usine
+        Index("uq_org_models_one_active", "org_id", unique=True, postgresql_where=text("status = 'active'")),
+    )

@@ -31,7 +31,7 @@ chaque décision au technicien.
 | `migrate` | applique les migrations Alembic puis s'arrête |
 | `api` | API REST FastAPI (documentation interactive : http://localhost:8000/docs) |
 | `mailpit` | faux serveur mail de développement (e-mails visibles sur http://localhost:8025) |
-| `worker` | worker Celery : calcule le risque et gère les alertes |
+| `worker` | worker Celery : calcule le risque, gère les alertes, réentraîne les modèles Pro |
 | `trainer` | (à la demande) entraîne le modèle commun : `docker compose run --rm trainer` |
 
 **Pourquoi un worker séparé ?** Calculer le risque prend du temps (modèle + explications).
@@ -551,6 +551,75 @@ alertes ; une petite usine préfère être dérangée moins souvent. Chaque usin
 | `app/ml/predictor.py` | `threshold_info` : seuil + effets attendus, mis en cache |
 | `app/ml/selection.py` | quel modèle utilise l'usine |
 | `tests/test_reglages.py` | 11 tests |
+
+---
+
+## 8. Réentraînement du modèle de l'usine (plan Pro)
+
+### 8.1 À quoi ça sert
+Le modèle commun a appris sur AI4I. Les machines d'une usine peuvent se comporter
+autrement. Le plan Pro permet de **réentraîner un modèle sur les données de l'usine**.
+Le sujet : « tâche longue ; nouveau modèle candidat, promu s'il est meilleur ».
+
+### 8.2 D'où viennent les étiquettes ?
+Une mesure seule ne dit pas si la machine est tombée en panne. Les machines (ou la GMAO
+de l'usine) peuvent envoyer avec leurs mesures un **retour terrain** optionnel :
+`"label": {"failure": true, "modes": ["PWF"]}` (partie 2). Seules ces mesures
+étiquetées servent au réentraînement. Le simulateur envoie les vraies étiquettes d'AI4I.
+
+### 8.3 Comment ça fonctionne
+1. `POST /org/models/retrain` (propriétaire ou administrateur, plan Pro sinon **402**) :
+   crée une ligne `org_models` au statut `training` et lance une **tâche Celery**.
+   L'API répond tout de suite (**202**) ; un deuxième réentraînement en même temps → 409.
+2. Le worker (`app/ml/retraining.py`) :
+   - récupère les mesures étiquetées de l'usine ; il en faut **au moins 500 dont 10
+     pannes**, sinon statut `failed` avec un message qui explique quoi envoyer ;
+   - met **25 % de côté** (jamais vus) et entraîne un **candidat** sur les 75 % restants,
+     avec exactement la même méthode que le modèle commun (`app/ml/training.py`) ;
+   - compare le candidat et le **modèle actuel** sur ces 25 %, avec le **ratio de coût
+     de l'usine** ;
+   - si le candidat **coûte moins cher** : il est réentraîné sur 100 % des données,
+     sauvegardé dans `org_models/<id de l'usine>/risk_model_vN.joblib` et devient
+     `active` (l'ancien passe `retired`) ; sinon il est `rejected`. Le message et toutes
+     les métriques sont enregistrés.
+3. `GET /org/models` : le modèle utilisé et l'historique des réentraînements.
+4. `app/ml/selection.py` choisit le modèle : **Pro avec un modèle actif → le sien**,
+   sinon le modèle commun. Le worker l'utilise pour les prédictions (son nom est
+   enregistré avec chaque prédiction) et l'API pour calculer les seuils.
+
+### 8.4 Pourquoi ces choix
+- **Promu seulement s'il est meilleur, mesuré par le coût** : un réentraînement sur peu
+  de données peut donner un modèle pire. On ne remplace jamais un modèle sans preuve.
+- **Comparaison sur des données que le candidat n'a pas vues** : sinon le candidat
+  gagnerait toujours (il « connaît les réponses »).
+- **Tâche Celery** : l'entraînement prend ~30 s (bien plus avec beaucoup de données) ;
+  une requête HTTP ne doit pas attendre aussi longtemps.
+- **Isolation** : chaque usine a son dossier ; le modèle n'est jamais envoyé par l'API
+  ni utilisé pour une autre usine (testé). Le worker écrit dans le volume Docker
+  `org_models`, l'API le monte en **lecture seule**.
+- **Un seul modèle actif par usine**, garanti par un index unique en base.
+
+### 8.5 Résultat réel et limite honnête
+Test de bout en bout sur la vraie plateforme : usine Pro, 1 500 vraies lignes AI4I
+étiquetées (42 pannes), réentraînement en 27 s → **candidat rejeté** (coût 59 contre 14
+pour le modèle commun).
+
+C'est **attendu avec nos données de démonstration** : le modèle commun a été entraîné
+sur tout AI4I, donc il a **déjà vu** ces 375 lignes de comparaison (sa PR-AUC dessus
+vaut 1,0). La comparaison l'avantage. Avec de vraies données d'usine, jamais vues par
+le modèle commun, la comparaison serait équitable. Le cas « promu » est vérifié par un
+test automatique qui simule un modèle actuel mauvais.
+
+### 8.6 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app/ml/training.py` | méthode d'entraînement commune (modèle commun et modèles d'usine) |
+| `app/ml/retraining.py` | données étiquetées, candidat, comparaison, promotion |
+| `app/ml/selection.py` | quel modèle pour quelle usine |
+| `app/worker/tasks.py` | tâche `retrain_org_model` |
+| `app/api/v1/models_api.py` | `GET /org/models`, `POST /org/models/retrain` |
+| `migrations/versions/0008_…` | table `org_models` |
+| `tests/test_reentrainement.py` | 6 tests |
 
 ---
 

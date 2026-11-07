@@ -7,3 +7,4 @@ __pycache__/
 *.db
 *.log
 ai4i2020.csv
+org_models/

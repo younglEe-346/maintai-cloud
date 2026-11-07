@@ -54,8 +54,10 @@ services:
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
       - FRONTEND_URL=http://localhost:8501
+      - ORG_MODELS_DIR=/app/org_models
     volumes:
       - ./models:/app/models:ro
+      - org_models:/app/org_models:ro
     depends_on:
       mailpit:
         condition: service_started
@@ -72,8 +74,10 @@ services:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=supersecretjwtkey_maintai_2026_ensam
+      - ORG_MODELS_DIR=/app/org_models
     volumes:
       - ./models:/app/models:ro
+      - org_models:/app/org_models   # modèles réentraînés par usine (plan Pro)
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -110,3 +114,4 @@ services:
 
 volumes:
   postgres_data:
+  org_models:

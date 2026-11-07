@@ -14,50 +14,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score
-from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, StandardScaler
+from sklearn.model_selection import train_test_split
 
 from app.ml.cost import DEFAULT_COST_RATIO, NEVER_ALERT, best_f1_threshold, best_threshold, confusion_at
 from app.ml.explain import shapley_contributions
-from app.ml.features import FEATURES, RAW_FEATURES, build_features, from_ai4i
+from app.ml.features import FEATURES, RAW_FEATURES, from_ai4i
+from app.ml.training import MIN_LIFT, SEED, candidates, oof_proba
 from app.ml.registry import next_version, save_artifact
 
-SEED = 42
 TARGET = "Machine failure"
 MODES = ["TWF", "HDF", "PWF", "OSF", "RNF"]
 UCI_ANNOUNCED = {"TWF": 120, "RNF": 5}  # chiffres de la page UCI cités dans le sujet
-MIN_LIFT = 5  # un mode est "prédictible" si sa PR-AUC dépasse 5 fois celle du hasard
-
-
-def candidates() -> dict:
-    feats = FunctionTransformer(build_features)
-    return {
-        "logistic_regression": Pipeline([
-            ("features", feats), ("scale", StandardScaler()),
-            ("model", LogisticRegression(class_weight="balanced", max_iter=5000)),
-        ]),
-        "random_forest": Pipeline([
-            ("features", feats),
-            ("model", RandomForestClassifier(
-                n_estimators=300, class_weight="balanced_subsample",
-                n_jobs=-1, random_state=SEED)),
-        ]),
-        "hist_gradient_boosting": Pipeline([
-            ("features", feats),
-            ("model", HistGradientBoostingClassifier(class_weight="balanced", random_state=SEED)),
-        ]),
-    }
-
-
-def oof_proba(pipeline, X, y) -> np.ndarray:
-    """Probabilités hors-échantillon : chaque ligne est prédite par un modèle
-    qui ne l'a jamais vue (validation croisée stratifiée en 5 blocs)."""
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-    return cross_val_predict(pipeline, X, y, cv=cv, method="predict_proba")[:, 1]
 
 
 def fmt(c: dict) -> str:

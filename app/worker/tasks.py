@@ -78,3 +78,29 @@ def process_telemetry_batch_async(machine_id: str, telemetry_ids: list):
         raise  # la tâche passe en échec dans Celery au lieu d'être ignorée en silence
     finally:
         db.close()
+
+
+@celery_app.task
+def retrain_org_model(job_id: str):
+    """Tâche longue : réentraîne le modèle d'une usine Pro (voir app/ml/retraining.py)."""
+    from app.ml.retraining import NotEnoughData, run_retraining
+    from app.models.models import OrgModel
+
+    db = SessionLocal()
+    try:
+        job = db.get(OrgModel, job_id)
+        try:
+            run_retraining(db, job)
+        except NotEnoughData as e:
+            job.status, job.message = "failed", str(e)
+        except Exception as e:  # on enregistre l'échec pour l'usine, puis on le signale à Celery
+            db.rollback()
+            job = db.get(OrgModel, job_id)
+            job.status, job.message = "failed", f"Erreur pendant l'entraînement : {e}"
+            job.finished_at = datetime.utcnow()
+            db.commit()
+            raise
+        job.finished_at = datetime.utcnow()
+        db.commit()
+    finally:
+        db.close()

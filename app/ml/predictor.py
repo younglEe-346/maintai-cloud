@@ -57,7 +57,7 @@ def predict_risk(rows: list[dict], cost_ratio: float | None = None, artifact: di
                 # modes dont la probabilité dépasse leur propre seuil (plusieurs possibles)
                 "flagged": [m for m in probs if probs[m] >= a["mode_thresholds"][m]],
                 # le mode probable n'a de sens que si on alerte
-                "probable_mode": max(probs, key=probs.get) if decision else None,
+                "probable_mode": max(probs, key=probs.get) if decision and probs else None,
             }
         contributions = None
         if phi is not None:

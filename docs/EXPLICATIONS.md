@@ -875,3 +875,164 @@ devient traçable dans Git.
 3. vérifie que `migrate` s'est terminé sans erreur et que `api`, `worker`, `postgres`,
    `redis` tournent ;
 4. vérifie que l'API répond.
+
+---
+
+## Questions probables à la soutenance (et réponses)
+
+### Intelligence artificielle
+
+**1. Pourquoi ne pas utiliser l'exactitude (accuracy) ?**
+Avec 3,39 % de pannes, un modèle qui répond toujours « pas de panne » a 96,6 %
+d'exactitude et ne détecte rien. On utilise la **PR-AUC** (le hasard fait 0,034, nous
+0,857 sur des données jamais vues) et le **coût** (50 × pannes manquées + fausses alertes).
+
+**2. Comment gérez-vous le déséquilibre des classes ?**
+`class_weight="balanced"` (une panne pèse ~30 fois plus pendant l'apprentissage), une
+validation croisée **stratifiée** (chaque bloc garde 3,4 % de pannes), et surtout un
+**seuil choisi par le coût** au lieu de 0,5. Pas de SMOTE : nous ne fabriquons pas de données.
+
+**3. Pourquoi le seuil vaut 0,022 et pas 0,5 ?**
+Parce qu'une panne manquée coûte 50 fois une fausse alerte : il est rationnel d'alerter
+dès un risque faible. On teste tous les seuils et on garde le moins cher. Résultat :
+93 % des pannes détectées, environ 2,5 fausses alertes par vraie panne.
+
+**4. Pourquoi calculer le seuil sur des probabilités hors-échantillon ?**
+Un modèle prédit trop bien les lignes qu'il a apprises (probabilités proches de 0 ou 1).
+Un seuil choisi dessus serait faux en conditions réelles. Avec la validation croisée,
+chaque probabilité vient d'un modèle qui n'a jamais vu la ligne.
+
+**5. Pourquoi un Random Forest ?**
+Nous avons comparé 3 modèles avec le même protocole : régression logistique (coût 3 033),
+Random Forest (1 378), Gradient Boosting (1 473). Le Random Forest a le coût le plus bas.
+La régression logistique échoue car les pannes ont des formes non linéaires (puissance
+trop basse **ou** trop haute ; chaleur = écart faible **et** vitesse basse).
+
+**6. Comment expliquez-vous une décision ?**
+Valeurs de Shapley **exactes** : à partir d'une machine « normale », on mesure de combien
+chaque mesure réelle fait monter le risque, en moyenne sur tous les ordres possibles
+(32 combinaisons pour 5 mesures). Les contributions s'additionnent exactement au risque
+affiché (vérifié à 10⁻¹⁶ près) et retrouvent la physique : couple et vitesse pour les
+pannes de puissance, usure et couple pour la surcharge.
+
+**7. Pourquoi RNF n'est pas prédit ? Et pourquoi TWF est faible ?**
+RNF = pannes aléatoires, indépendantes des paramètres : sa PR-AUC est au niveau du
+hasard, afficher une probabilité serait mensonger. TWF : l'outil casse à un moment en
+partie aléatoire en fin de vie ; le modèle reconnaît la zone à risque (usure élevée) mais
+pas l'instant exact.
+
+**8. Expliquez l'écart avec la page UCI (120 TWF et 5 RNF annoncés ; 46 et 19 mesurés).**
+Faits mesurés : les 46 TWF sont des pannes ; 18 des 19 RNF ont `Machine failure = 0` ;
+9 pannes n'ont aucun mode. Explication probable (à confirmer sur la page UCI) : 120 compte
+les fins de vie d'outil (remplacé **ou** cassé), pas seulement les pannes ; et les
+étiquettes RNF du fichier publié ne sont pas cohérentes avec la colonne de panne. Nous
+prenons `Machine failure` comme vérité pour le risque.
+
+**9. Comment est versionné le modèle ?**
+Chaque entraînement crée `risk_model_vN.joblib` (jamais écrasé) et un rapport JSON
+(métriques, empreinte SHA-256 du fichier de données). Chaque prédiction en base garde le
+nom du modèle qui l'a produite : on sait toujours pourquoi une alerte a été levée.
+
+**10. Comment marche le réentraînement Pro ? Pourquoi votre candidat est rejeté ?**
+Candidat entraîné sur 75 % des mesures étiquetées de l'usine, comparé au modèle actuel
+sur les 25 % restants avec le coût de l'usine, promu seulement s'il coûte moins cher.
+Dans notre démo, l'usine rejoue AI4I, que le modèle commun a **déjà appris** : il est
+avantagé (PR-AUC 1,0 sur ces lignes), donc le candidat est rejeté. Avec de vraies données
+d'usine, la comparaison serait équitable. La promotion est testée automatiquement.
+
+### Architecture et données
+
+**11. Pourquoi un worker Celery au lieu de calculer dans l'API ?**
+Le calcul (modèle + 32 combinaisons d'explication) prend du temps. L'API répond tout de
+suite (202) et le worker travaille en arrière-plan ; on peut lancer plusieurs workers si
+la charge augmente. Les mesures sont enregistrées par l'API : rien n'est perdu si le
+worker est arrêté.
+
+**12. Comment garantissez-vous une seule alerte ouverte par machine ?**
+Deux protections : le worker **verrouille la machine** (`SELECT … FOR UPDATE`) pendant un
+lot, et la base a un **index unique partiel** sur les alertes non fermées. Même en cas de
+bug, la base refuserait une deuxième alerte (testé).
+
+**13. Pourquoi K = 1 pour l'ouverture des alertes ?**
+Mesuré : en rejouant AI4I, K = 3 ne couvre que 25 % des pannes, K = 1 en couvre 96 %, car
+AI4I contient des cycles indépendants (une panne = une mesure isolée). L'hystérésis reste
+utile pour la fermeture (3 mesures basses) et l'unicité. K est réglable par usine.
+
+**14. Comment fonctionne la déduplication ?**
+Contrainte unique `(machine, message_id)` en base et `INSERT … ON CONFLICT DO NOTHING` :
+une mesure renvoyée (coupure réseau) est ignorée et signalée, même si deux lots
+identiques arrivent en même temps. Les doublons ne consomment pas de quota.
+
+**15. Pourquoi Alembic ?**
+`create_all` ne modifie jamais une table existante. Alembic enregistre chaque changement
+de schéma (8 migrations) et met n'importe quelle base à jour au démarrage, y compris les
+bases créées avant son arrivée (reprises sans perte : comptes, clés hachées).
+
+### SaaS et sécurité
+
+**16. Comment une usine est-elle isolée des autres ?**
+Chaque requête est authentifiée (JWT) ; toutes les requêtes en base filtrent sur l'usine
+de l'utilisateur ; un identifiant d'une autre usine répond 404 ; les modèles d'usine sont
+dans des dossiers séparés. Un test vérifie route par route qu'une usine B n'obtient rien
+de l'usine A.
+
+**17. Pourquoi hacher les clés d'API en SHA-256 et les mots de passe en bcrypt ?**
+Un mot de passe humain est devinable : il faut un hachage **lent** (bcrypt). Une clé
+aléatoire de 192 bits est impossible à deviner : SHA-256 suffit et permet de retrouver la
+machine directement par index. Dans les deux cas, une fuite de la base ne donne rien
+d'utilisable. Conséquence : la clé n'est montrée qu'une seule fois.
+
+**18. Comment sont appliquées les limites des plans ?**
+Machines : comptage à la création (402). Mesures par jour : compteur Redis atomique
+(`INCRBY`) réservé avant l'enregistrement ; dépassement → tout le lot est refusé (429
+avec `Retry-After`). Réentraînement et export : réservés au Pro (402).
+
+**19. Que voit le super-administrateur ?**
+Des **indicateurs** par usine (plan, machines, mesures du jour, alertes, modèle) et l'état
+des workers, pas les mesures ni les clés. Il est créé en ligne de commande sur le
+serveur, jamais par l'API.
+
+**20. Comment avez-vous testé ?**
+102 tests pytest sur une vraie base PostgreSQL de test, avec le vrai modèle et de vraies
+lignes AI4I ; chaque exigence du sujet a ses tests (tableau 13.2). En plus, des
+vérifications de bout en bout sur la plateforme réelle : hystérésis sur 7 lots,
+réentraînement réel (27 s), simulateur sur 3 usines en parallèle, tableau de bord avec
+`AppTest`.
+
+**21. Quelles sont les limites de votre projet ?**
+Voir le bilan ci-dessous : paiement simulé, modèle sans la colonne `Type`, comparaison
+du réentraînement biaisée par AI4I, pas de test de charge à 1 million de mesures par jour.
+
+---
+
+## Bilan
+
+### Ce qui marche (vérifié sur la plateforme réelle)
+- Démarrage complet avec `docker compose up` : API, worker, base, Redis, Mailpit,
+  tableau de bord, migrations automatiques.
+- IA : risque, seuil de coût réglable, modes de panne, explications, versions.
+- Réception des mesures : validation, quarantaine, déduplication, quotas.
+- Alertes : hystérésis, unicité, acquittement.
+- Usines, rôles, invitations par e-mail (reçues dans Mailpit), plans, clés d'API.
+- Réentraînement Pro (tâche de fond réelle), export CSV, super-administrateur.
+- Simulateur : 3 usines, 7 machines en parallèle ; tableau de bord pour tous les rôles.
+
+### Ce qui est testé
+102 tests automatiques, tous verts (dans Docker et en local), couvrant chaque exigence
+du sujet (tableau 13.2), dont l'isolation entre usines route par route.
+
+### Ce qui reste à faire ou à améliorer
+- **Vérifier sur la page UCI** la formulation exacte des 120 TWF et 5 RNF (page
+  inaccessible pendant le projet) avant de l'écrire dans le rapport.
+- **Paiement** : le changement de plan est simulé (pas de prestataire de paiement).
+- **Colonne `Type` (L/M/H)** non utilisée, car les machines ne l'envoient pas ; l'ajouter
+  pourrait améliorer les pannes de surcharge (OSF).
+- **Réentraînement** : comparaison biaisée en démo (le modèle commun a vu AI4I) ; à
+  évaluer avec de vraies données d'usine.
+- **Charge** : pas de test à 1 million de mesures par jour ; les explications coûtent
+  32 prédictions par mesure (à surveiller, plusieurs workers si besoin).
+- **Comptes** : pas de réinitialisation de mot de passe ni de vérification de l'e-mail à
+  l'inscription ; pas de HTTPS (à mettre derrière un proxy en production).
+- **Git** : le travail est sur la branche `feature/ia-modele`, à fusionner dans `main` et
+  à pousser sur GitHub ; l'auteur des commits est « Your Name » (à corriger avec
+  `git config user.name`).

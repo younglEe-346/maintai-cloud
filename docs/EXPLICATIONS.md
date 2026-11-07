@@ -32,6 +32,7 @@ chaque décision au technicien.
 | `api` | API REST FastAPI (documentation interactive : http://localhost:8000/docs) |
 | `mailpit` | faux serveur mail de développement (e-mails visibles sur http://localhost:8025) |
 | `worker` | worker Celery : calcule le risque, gère les alertes, réentraîne les modèles Pro |
+| `dashboard` | tableau de bord Streamlit : http://localhost:8501 |
 | `trainer` | (à la demande) entraîne le modèle commun : `docker compose run --rm trainer` |
 
 **Pourquoi un worker séparé ?** Calculer le risque prend du temps (modèle + explications).
@@ -747,6 +748,47 @@ voit que ses machines.
 | `simulator/stream_simulator.py` | `setup`, `run`, `demo` |
 | `simulator/config.json` | comptes et clés de la démo (créé par `setup`, pas dans Git) |
 | `tests/test_simulateur.py` | 4 tests (découpage, erreurs, rejeu de bout en bout) |
+
+---
+
+## 12. Tableau de bord (Streamlit)
+
+### 12.1 À quoi ça sert
+L'interface des utilisateurs : http://localhost:8501 (service Docker `dashboard`).
+
+### 12.2 Ce qu'on y trouve
+| Écran | Pour qui | Contenu |
+|---|---|---|
+| Connexion / inscription | tout le monde | se connecter, inscrire son usine ; le lien d'invitation (`?invitation=…`) ouvre le formulaire d'acceptation |
+| 🚨 Alertes | tous | alertes actives **rafraîchies toutes les 5 s**, risque max, mode probable, explication, bouton **Acquitter** ; historique |
+| 🏭 Machines | tous (gestion : responsables) | liste, courbe du **risque et du seuil**, courbes des mesures, mesures à risque avec leur explication ; déclarer une machine (clé montrée une fois), remplacer / révoquer la clé, archiver |
+| 🎚️ Coûts et seuils | tous (modification : responsables) | curseur du ratio de coût avec **aperçu immédiat** du seuil, des pannes détectées et des fausses alertes ; réglages d'hystérésis |
+| 👥 Équipe | tous (gestion : responsables) | membres, invitations, changement de rôle, retrait |
+| 💳 Abonnement, IA, export | tous | consommation du plan, changement de plan (propriétaire), modèle utilisé, **réentraînement** (Pro), **export CSV** (Pro), quarantaine |
+| Super-administrateur | équipe MaintAI | tableau des usines, changement de plan, état des workers |
+
+### 12.3 Pourquoi ces choix
+- **Le tableau de bord ne parle qu'à l'API**, comme n'importe quel client : il n'a aucun
+  accès direct à la base. Toutes les règles (rôles, plans, isolation) sont appliquées
+  par l'API ; un bouton caché dans l'interface n'est jamais la seule protection.
+- **Streamlit** : une interface complète en Python, sans HTML ni JavaScript, adaptée à
+  un projet de data science.
+- **`st.fragment(run_every=5)`** : seule la zone des alertes se rafraîchit, pas toute la page.
+- **Export généré à la demande** : sinon chaque affichage de la page téléchargerait toutes
+  les données.
+
+### 12.4 Vérification
+- Test automatique `tests/test_dashboard.py` : la page se charge sans erreur (outil
+  officiel `streamlit.testing.v1.AppTest`, sans navigateur).
+- Vérifié contre la vraie API avec le même outil : connexion d'un propriétaire Pro (5
+  onglets, seuil 2,2 %, 3/50 machines, aucune erreur), du super-administrateur (usines,
+  workers) et message clair pour un mauvais mot de passe.
+
+### 12.5 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `app_frontend.py` | tout le tableau de bord |
+| `tests/test_dashboard.py` | test de chargement |
 
 ---
 

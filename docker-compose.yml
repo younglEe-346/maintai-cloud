@@ -85,6 +85,19 @@ services:
       redis:
         condition: service_started
 
+  # Tableau de bord : http://localhost:8501 (ne parle qu'à l'API)
+  dashboard:
+    build: .
+    container_name: maintai_dashboard
+    command: streamlit run app_frontend.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://api:8000/api/v1
+    depends_on:
+      api:
+        condition: service_started
+
   # Entraînement du modèle : docker compose run --rm trainer
   trainer:
     build: .

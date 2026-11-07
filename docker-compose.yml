@@ -46,9 +46,20 @@ services:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/maintai_db
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=supersecretjwtkey_maintai_2026_ensam
+    volumes:
+      - ./models:/app/models:ro
     depends_on:
       - postgres
       - redis
+
+  # Entraînement du modèle : docker compose run --rm trainer
+  trainer:
+    build: .
+    profiles: ["tools"]
+    command: python -m ml.train
+    volumes:
+      - ./data:/app/data:ro
+      - ./models:/app/models
 
 volumes:
   postgres_data:

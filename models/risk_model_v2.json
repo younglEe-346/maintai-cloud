@@ -1,0 +1,225 @@
+{
+  "name": "risk_model_v2",
+  "version": 2,
+  "trained_at": "2026-11-07T19:30:51+00:00",
+  "algorithm": "random_forest",
+  "raw_features": [
+    "air_temp",
+    "process_temp",
+    "rotational_speed",
+    "torque",
+    "tool_wear"
+  ],
+  "features": [
+    "air_temp",
+    "process_temp",
+    "rotational_speed",
+    "torque",
+    "tool_wear",
+    "temp_diff",
+    "power_w",
+    "wear_x_torque"
+  ],
+  "cost_ratio": 50.0,
+  "threshold": 0.021666666666666667,
+  "mode_thresholds": {
+    "TWF": 0.02,
+    "HDF": 0.4,
+    "PWF": 0.42333333333333334,
+    "OSF": 0.19666666666666666,
+    "RNF": 0.056666666666666664
+  },
+  "predictable_modes": [
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF"
+  ],
+  "metrics": {
+    "comparison_cv": {
+      "logistic_regression": {
+        "pr_auc": 0.4465927627205398,
+        "threshold": 0.4734188406833304,
+        "cost_ratio": 50.0,
+        "cost": 3033.0,
+        "tp": 236,
+        "fn": 35,
+        "fp": 1283,
+        "tn": 6446,
+        "recall": 0.8708487084870848,
+        "precision": 0.1553653719552337
+      },
+      "random_forest": {
+        "pr_auc": 0.8686469914355759,
+        "threshold": 0.021666666666666667,
+        "cost_ratio": 50.0,
+        "cost": 1378.0,
+        "tp": 257,
+        "fn": 14,
+        "fp": 678,
+        "tn": 7051,
+        "recall": 0.948339483394834,
+        "precision": 0.2748663101604278
+      },
+      "hist_gradient_boosting": {
+        "pr_auc": 0.8717153618185601,
+        "threshold": 0.0021873058034288365,
+        "cost_ratio": 50.0,
+        "cost": 1473.0,
+        "tp": 254,
+        "fn": 17,
+        "fp": 623,
+        "tn": 7106,
+        "recall": 0.9372693726937269,
+        "precision": 0.2896237172177879
+      }
+    },
+    "holdout_test": {
+      "pr_auc": 0.8567454216182385,
+      "threshold": 0.021666666666666667,
+      "cost_ratio": 50.0,
+      "cost": 359.0,
+      "tp": 64,
+      "fn": 4,
+      "fp": 159,
+      "tn": 1773,
+      "recall": 0.9411764705882353,
+      "precision": 0.28699551569506726
+    },
+    "oof_full_pr_auc": 0.8677803211050643,
+    "deployed_threshold": {
+      "threshold": 0.021666666666666667,
+      "cost_ratio": 50.0,
+      "cost": 2033.0,
+      "tp": 314,
+      "fn": 25,
+      "fp": 783,
+      "tn": 8878,
+      "recall": 0.9262536873156342,
+      "precision": 0.2862351868732908
+    },
+    "modes": {
+      "TWF": {
+        "count": 46,
+        "prevalence": 0.0046,
+        "pr_auc_oof": 0.10071415532452489,
+        "threshold_f1": 0.02,
+        "holdout_test": {
+          "threshold": 0.01,
+          "cost_ratio": 1.0,
+          "cost": 114.0,
+          "tp": 6,
+          "fn": 4,
+          "fp": 110,
+          "tn": 1880,
+          "recall": 0.6,
+          "precision": 0.05172413793103448,
+          "pr_auc": 0.06065308631952071
+        },
+        "predictable": true
+      },
+      "HDF": {
+        "count": 115,
+        "prevalence": 0.0115,
+        "pr_auc_oof": 0.9894337978073608,
+        "threshold_f1": 0.4,
+        "holdout_test": {
+          "threshold": 0.4033333333333333,
+          "cost_ratio": 1.0,
+          "cost": 4.0,
+          "tp": 27,
+          "fn": 2,
+          "fp": 2,
+          "tn": 1969,
+          "recall": 0.9310344827586207,
+          "precision": 0.9310344827586207,
+          "pr_auc": 0.9659225880153993
+        },
+        "predictable": true
+      },
+      "PWF": {
+        "count": 95,
+        "prevalence": 0.0095,
+        "pr_auc_oof": 0.9995746943115364,
+        "threshold_f1": 0.42333333333333334,
+        "holdout_test": {
+          "threshold": 0.28,
+          "cost_ratio": 1.0,
+          "cost": 0.0,
+          "tp": 13,
+          "fn": 0,
+          "fp": 0,
+          "tn": 1987,
+          "recall": 1.0,
+          "precision": 1.0,
+          "pr_auc": 0.9999999999999998
+        },
+        "predictable": true
+      },
+      "OSF": {
+        "count": 98,
+        "prevalence": 0.0098,
+        "pr_auc_oof": 0.8924113968060096,
+        "threshold_f1": 0.19666666666666666,
+        "holdout_test": {
+          "threshold": 0.15333333333333332,
+          "cost_ratio": 1.0,
+          "cost": 6.0,
+          "tp": 16,
+          "fn": 0,
+          "fp": 6,
+          "tn": 1978,
+          "recall": 1.0,
+          "precision": 0.7272727272727273,
+          "pr_auc": 0.8475823110498033
+        },
+        "predictable": true
+      },
+      "RNF": {
+        "count": 19,
+        "prevalence": 0.0019,
+        "pr_auc_oof": 0.00444022162683912,
+        "threshold_f1": 0.056666666666666664,
+        "holdout_test": {
+          "threshold": 0.0,
+          "cost_ratio": 1.0,
+          "cost": 1996.0,
+          "tp": 4,
+          "fn": 0,
+          "fp": 1996,
+          "tn": 0,
+          "recall": 1.0,
+          "precision": 0.002,
+          "pr_auc": 0.02235157545605307
+        },
+        "predictable": false
+      },
+      "top1_on_test_failures": {
+        "correct": 65,
+        "total": 66
+      }
+    }
+  },
+  "data": {
+    "rows": 10000,
+    "failures": 339,
+    "mode_counts": {
+      "TWF": 46,
+      "HDF": 115,
+      "PWF": 95,
+      "OSF": 98,
+      "RNF": 19
+    },
+    "uci_announced": {
+      "TWF": 120,
+      "RNF": 5
+    },
+    "failure_without_mode": 9,
+    "rnf_without_failure": 18,
+    "mode_without_failure": 18,
+    "file": "data/ai4i2020.csv",
+    "sha256": "dc6630cd9b1f0f853922fad78a1b6436570d3f1ec863f1dd5c4340ac56bc8a8e"
+  },
+  "sklearn_version": "1.9.1",
+  "seed": 42
+}

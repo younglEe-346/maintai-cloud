@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Column, String, Float, DateTime, ForeignKey, Integer, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.session import Base
@@ -44,6 +44,25 @@ class Telemetry(Base):
     tool_wear = Column(Float, nullable=False)
 
     machine = relationship("Machine", back_populates="telemetries")
+
+class Prediction(Base):
+    """Résultat du modèle pour une mesure, avec la version du modèle qui l'a produit."""
+    __tablename__ = "predictions"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    telemetry_id = Column(String, ForeignKey("telemetries.id"), nullable=False, unique=True)
+    machine_id = Column(String, ForeignKey("machines.id"), nullable=False, index=True)
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    risk_score = Column(Float, nullable=False)
+    decision = Column(Boolean, nullable=False)
+    threshold = Column(Float, nullable=False)
+    model_version = Column(String, nullable=False)
+    # remplis aux étapes suivantes (mode de panne, contributions)
+    failure_modes = Column(JSON, nullable=True)
+    contributions = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    telemetry = relationship("Telemetry")
+
 
 class Alert(Base):
     __tablename__ = "alerts"

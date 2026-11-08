@@ -182,12 +182,17 @@ def tab_machines(is_admin: bool):
         for m in machines]), width="stretch", hide_index=True)
 
     choice = st.selectbox("Machine", machines, format_func=lambda m: m["name"])
+    if choice is None:
+        return
     data = call("GET", f"/machines/{choice['id']}/mesures", params={"limit": 300}).json()
     if data:
-        df = pd.DataFrame(data).iloc[::-1]
+        # risque et seuil lus directement dans la réponse JSON (une mesure pas encore
+        # traitée par le worker n'a pas de prédiction : valeur vide)
+        df = pd.DataFrame(data)
+        df["risque"] = [d["prediction"]["risk_score"] if d["prediction"] else None for d in data]
+        df["seuil"] = [d["prediction"]["threshold"] if d["prediction"] else None for d in data]
+        df = df.iloc[::-1]
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df["risque"] = df["prediction"].map(lambda p: p["risk_score"] if p else None)
-        df["seuil"] = df["prediction"].map(lambda p: p["threshold"] if p else None)
         st.markdown("**Risque de panne** (et seuil d'alerte de l'usine)")
         st.line_chart(df.set_index("timestamp")[["risque", "seuil"]])
         st.markdown("**Mesures**")
@@ -257,7 +262,7 @@ def tab_team(me: dict):
     with st.form("invite"):
         email = st.text_input("E-mail du collègue")
         roles = ["member", "admin"] if me["role"] == "owner" else ["member"]
-        role = st.selectbox("Rôle", roles, format_func=ROLE_LABELS.get)
+        role = st.selectbox("Rôle", roles, format_func=lambda r: ROLE_LABELS[r])
         if st.form_submit_button("Envoyer l'invitation"):
             r = call("POST", "/org/invitations", json={"email": email, "role": role})
             ok_or_error(r, "Invitation envoyée par e-mail (en développement : voir http://localhost:8025)")
@@ -274,6 +279,8 @@ def tab_team(me: dict):
     if others:
         st.subheader("Gérer les membres")
         target = st.selectbox("Membre", others, format_func=lambda m: f"{m['full_name']} ({ROLE_LABELS[m['role']]})")
+        if target is None:
+            return
         c1, c2 = st.columns(2)
         if me["role"] == "owner":
             new_role = "admin" if target["role"] == "member" else "member"

@@ -1,0 +1,126 @@
+// Tous les appels à l'API FastAPI passent par ce fichier.
+// - l'adresse de l'API vient de VITE_API_URL (fichier .env), sinon http://localhost:8000/api/v1 ;
+// - le jeton JWT est gardé dans le navigateur (localStorage) et ajouté à chaque requête ;
+// - toute erreur devient une ApiError avec un code clair, traduit ensuite par l'interface.
+
+export const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+
+const TOKEN_KEY = "maintai.token";
+
+export const tokenStore = {
+  get(): string | null {
+    try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  },
+  set(token: string): void {
+    try { localStorage.setItem(TOKEN_KEY, token); } catch { /* navigateur privé : session non conservée */ }
+  },
+  clear(): void {
+    try { localStorage.removeItem(TOKEN_KEY); } catch { /* rien à faire */ }
+  },
+};
+
+/** Erreur d'un champ renvoyée par FastAPI (code 422). */
+export interface FieldError { field: string; message: string; }
+
+/** Erreur lisible : `kind` choisit le message traduit, `detail` est le texte du serveur. */
+export class ApiError extends Error {
+  kind: "network" | "unauthorized" | "forbidden" | "notFound" | "conflict" | "validation" | "quota" | "server" | "other";
+  status: number;
+  detail: string;
+  fields: FieldError[];
+
+  constructor(status: number, detail: string, fields: FieldError[] = []) {
+    super(detail || `HTTP ${status}`);
+    this.status = status;
+    this.detail = detail;
+    this.fields = fields;
+    this.kind =
+      status === 0 ? "network"
+      : status === 401 ? "unauthorized"
+      : status === 403 ? "forbidden"
+      : status === 404 ? "notFound"
+      : status === 409 || status === 410 ? "conflict"
+      : status === 422 ? "validation"
+      : status === 402 || status === 429 ? "quota"
+      : status >= 500 ? "server"
+      : "other";
+  }
+}
+
+/** Appelé quand le serveur répond 401 (jeton expiré) : l'application déconnecte l'utilisateur. */
+let onUnauthorized: () => void = () => {};
+export function setUnauthorizedHandler(handler: () => void): void { onUnauthorized = handler; }
+
+type Body = { json: unknown } | { form: Record<string, string> } | undefined;
+
+export async function api<T>(path: string, options: { method?: string; body?: Body } = {}): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = tokenStore.get();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let body: BodyInit | undefined;
+  if (options.body && "json" in options.body) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(options.body.json);
+  } else if (options.body && "form" in options.body) {
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
+    body = new URLSearchParams(options.body.form).toString();
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { method: options.method ?? "GET", headers, body });
+  } catch {
+    // API éteinte, mauvaise adresse ou origine refusée par le CORS
+    throw new ApiError(0, "");
+  }
+
+  if (response.status === 204) return undefined as T;
+  const data: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = toApiError(response.status, data);
+    if (error.kind === "unauthorized" && token) onUnauthorized();
+    throw error;
+  }
+  return data as T;
+}
+
+function toApiError(status: number, data: unknown): ApiError {
+  const detail = (data as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return new ApiError(status, detail);
+  if (Array.isArray(detail)) {
+    // Format FastAPI : [{ loc: ["body", "password"], msg: "..." }, ...]
+    const fields = detail.map((d: { loc?: unknown[]; msg?: string }) => ({
+      field: String(d.loc?.[d.loc.length - 1] ?? ""),
+      message: d.msg ?? "",
+    }));
+    return new ApiError(status, "", fields);
+  }
+  return new ApiError(status, "");
+}
+
+// ---------- Types et appels de l'authentification (app/api/v1/auth.py) ----------
+
+export interface Token { access_token: string; token_type: string; }
+
+export interface Me {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "owner" | "admin" | "member";
+  is_superadmin: boolean;
+  organization: { id: string; name: string; plan: "FREE" | "PRO" } | null;
+}
+
+export interface RegisterInput { org_name: string; full_name: string; email: string; password: string; }
+
+export const authApi = {
+  /** POST /auth/login : formulaire OAuth2, username = e-mail. */
+  login: (email: string, password: string) =>
+    api<Token>("/auth/login", { method: "POST", body: { form: { username: email, password } } }),
+  /** POST /auth/register : crée l'usine (plan Gratuit) et son propriétaire. */
+  register: (input: RegisterInput) =>
+    api<Token>("/auth/register", { method: "POST", body: { json: input } }),
+  /** GET /auth/me : qui est connecté. */
+  me: () => api<Me>("/auth/me"),
+};

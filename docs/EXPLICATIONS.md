@@ -792,6 +792,116 @@ L'interface des utilisateurs : http://localhost:8501 (service Docker `dashboard`
 
 ---
 
+## 12 bis. Front-end React (interface JavaScript)
+
+### 12 bis.1 À quoi ça sert
+Une deuxième interface, demandée en JavaScript : une **application web React** qui
+s'ouvre dans le navigateur (http://localhost:5173). Elle utilise **la même API** que le
+tableau de bord Streamlit : elle n'a aucun accès direct à la base, toutes les règles
+(rôles, plans, isolation des usines) restent appliquées par l'API.
+
+Elle est construite **un écran à la fois** :
+
+| Étape | Écran | État |
+|---|---|---|
+| 1 | Inscription et connexion | ✅ fait |
+| 2 | Liste des machines, ajout, clé d'API montrée une seule fois | à faire |
+| 3 | Alertes avec acquittement (nom + commentaire) | à faire |
+| 4 | Détail d'une machine : risque, mode de panne, contributions | à faire |
+| 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | à faire |
+| 6 | Équipe : invitations et rôles | à faire |
+
+### 12 bis.2 Les outils, expliqués simplement
+| Outil | Rôle, en une phrase |
+|---|---|
+| **React** | découpe l'écran en *composants* (un formulaire, un bouton…) qui se redessinent tout seuls quand leurs données changent |
+| **TypeScript** | du JavaScript avec des *types* : l'éditeur signale une faute (champ mal nommé, texte non traduit) avant de lancer l'application |
+| **Vite** | lance l'application en développement (rechargement instantané) et fabrique la version finale (`npm run build`) |
+| **Tailwind CSS** | la mise en forme s'écrit directement dans les classes (`bg-blue-600`, `rounded-md`…) au lieu d'un gros fichier CSS |
+
+**Aucune autre dépendance** : pas de bibliothèque de traduction, pas de routeur, pas de
+client HTTP. `fetch` (intégré au navigateur) suffit pour appeler l'API, et un simple
+dictionnaire suffit pour deux langues. Moins de dépendances = moins de choses à
+comprendre, à mettre à jour et à sécuriser.
+
+### 12 bis.3 Lancer le front-end
+Prérequis : Node.js 20 ou plus, et l'API lancée (`docker compose up -d`).
+```
+cd frontend
+npm install        # une seule fois : télécharge React, Vite, Tailwind dans node_modules/
+npm run dev        # ouvre http://localhost:5173
+```
+L'adresse de l'API est `http://localhost:8000/api/v1` par défaut ; pour la changer,
+copier `frontend/.env.example` en `frontend/.env` et modifier `VITE_API_URL`.
+
+### 12 bis.4 Comment ça fonctionne
+**Connexion (étape 1).**
+1. L'utilisateur remplit le formulaire. Le navigateur vérifie d'abord les règles simples
+   (e-mail valide, mot de passe de 8 caractères, nom d'usine de 2 à 100 caractères) :
+   ce sont **les mêmes règles que l'API** (`RegisterIn` dans `app/api/v1/auth.py`), on
+   prévient donc l'utilisateur sans attendre le serveur.
+2. Le front-end appelle `POST /auth/register` (JSON) ou `POST /auth/login` (formulaire
+   OAuth2 : `username` = e-mail). L'API répond avec un **jeton JWT**.
+3. Le jeton est gardé dans le navigateur (`localStorage`) : l'utilisateur reste connecté
+   s'il recharge la page. Il est ensuite envoyé à chaque requête dans l'en-tête
+   `Authorization: Bearer <jeton>`.
+4. Le front-end appelle `GET /auth/me` pour savoir qui est connecté (nom, rôle, usine, plan).
+5. Si l'API répond un jour **401** (jeton expiré au bout de 24 h), l'utilisateur est
+   déconnecté automatiquement et voit « Votre session a expiré : reconnectez-vous ».
+
+**Erreurs lisibles.** Toute erreur de l'API devient une `ApiError` avec un *type*
+(réseau, non connecté, rôle insuffisant, limite du plan, champ invalide…). L'écran
+affiche une phrase claire pour ce type, puis le message exact du serveur. Si l'API est
+éteinte, le message dit quoi faire (`docker compose up -d`).
+
+**Deux langues.** `src/i18n.tsx` contient un dictionnaire français et un anglais avec
+**les mêmes clés** ; TypeScript refuse de compiler si une traduction manque. Le bouton
+en haut à droite change de langue, le choix est retenu. L'API répond en français : les
+messages connus (mauvais mot de passe, e-mail déjà utilisé…) sont traduits en anglais,
+les autres sont affichés tels quels.
+
+**CORS.** Un navigateur refuse qu'une page de `localhost:5173` lise les réponses de
+`localhost:8000` (autre port = autre *origine*), sauf si l'API l'autorise. L'API autorise
+**seulement** les adresses listées dans `ALLOWED_ORIGINS` (par défaut
+`http://localhost:8501,http://localhost:5173`), jamais `*`. Elle n'accepte aussi que
+les méthodes utilisées (GET, POST, PUT, PATCH, DELETE) et deux en-têtes
+(`Authorization`, `Content-Type`), et **pas de cookies** : le jeton voyage dans
+l'en-tête. Vite est réglé sur ce port précis (`strictPort`) : s'il est déjà pris, Vite
+s'arrête au lieu de prendre un autre port que l'API refuserait.
+
+### 12 bis.5 Pourquoi ces choix
+- **Le jeton dans `localStorage`** : simple, et la session survit au rechargement. Le
+  risque connu : un script malveillant injecté dans la page pourrait le lire (attaque
+  *XSS*). React échappe tout le texte affiché et on n'insère jamais de HTML brut, ce
+  qui limite ce risque ; l'alternative (cookie `HttpOnly`) demanderait de changer
+  l'authentification de l'API.
+- **Pas de routeur** pour l'instant : un seul écran après connexion. On en ajoutera un
+  minimal quand il y aura plusieurs pages.
+- **Le front-end appelle l'API directement** (et non via un proxy de Vite) : c'est ce
+  qui se passera en production, et cela vérifie vraiment le réglage CORS.
+
+### 12 bis.6 Vérification
+- `npm run build` : TypeScript vérifie tout le code, puis Vite fabrique la version finale.
+- Test de l'API `tests/test_securite.py::test_cors_autorise_le_front_end_react` : le
+  front-end est autorisé, un en-tête inconnu est refusé, pas de cookies.
+- Essai réel dans le navigateur contre l'API Docker : inscription, déconnexion,
+  reconnexion, mauvais mot de passe, e-mail déjà utilisé, passage en anglais.
+
+### 12 bis.7 Fichiers
+| Fichier | Rôle |
+|---|---|
+| `frontend/package.json` | dépendances et commandes (`dev`, `build`) |
+| `frontend/vite.config.ts` | Vite + React + Tailwind, port 5173 fixe |
+| `frontend/src/api.ts` | **tous** les appels à l'API, jeton, erreurs |
+| `frontend/src/auth.tsx` | session : connexion, inscription, déconnexion, expiration |
+| `frontend/src/i18n.tsx` | traductions français / anglais |
+| `frontend/src/components/ui.tsx` | boutons, champs, messages d'erreur, chargement |
+| `frontend/src/pages/AuthPage.tsx` | écran 1 : connexion et inscription |
+| `frontend/src/pages/HomePage.tsx` | accueil après connexion |
+| `frontend/src/App.tsx` | en-tête (langue, déconnexion) et choix de l'écran |
+
+---
+
 ## 13. Tests et sécurité
 
 ### 13.1 Comment lancer les tests
@@ -833,7 +943,7 @@ s'exécutent directement dans le processus de test. Les mesures envoyées sont d
 | Jeton falsifié ou expiré | JWT signé avec `SECRET_KEY`, durée limitée (24 h) ; 401 (testé) |
 | Action non autorisée | rôle vérifié par l'API sur chaque route (403), pas seulement caché dans l'interface |
 | Clé secrète dans le code | `SECRET_KEY` lue dans l'environnement (fichier `.env`, jamais commité) ; avertissement si la clé de développement est utilisée |
-| Site web malveillant qui appelle l'API | **CORS** limité à `ALLOWED_ORIGINS` (le tableau de bord) au lieu de `*` (testé) |
+| Site web malveillant qui appelle l'API | **CORS** limité à `ALLOWED_ORIGINS` (tableau de bord et front-end React, adresses précises) au lieu de `*`, méthodes et en-têtes listés, pas de cookies (testé) |
 | Données absurdes ou attaque par gros lots | validation, bornes physiques, 1 000 mesures maximum par lot, quotas par plan |
 
 ### 13.4 Fichiers

@@ -14,12 +14,16 @@ app = FastAPI(
 )
 
 # CORS : seuls les sites listés dans ALLOWED_ORIGINS peuvent appeler l'API depuis un navigateur
+# (le front-end React, http://localhost:5173 en développement). Tout est listé précisément :
+# - méthodes : celles qu'utilise l'API ;
+# - en-têtes : Authorization (jeton JWT) et Content-Type (JSON ou formulaire) ;
+# - pas de cookies (allow_credentials=False) : le jeton voyage dans l'en-tête Authorization.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])

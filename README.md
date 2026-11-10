@@ -35,6 +35,7 @@ propres données.
 | `postgres` | base de données | localhost:5432 |
 | `redis` | file de tâches + compteurs de quotas | localhost:6379 |
 | `mailpit` | faux serveur mail (invitations) | http://localhost:8025 |
+| *(hors Docker)* `frontend/` | interface React : `cd frontend && npm install && npm run dev` | http://localhost:5173 |
 | `migrate` | met la base à jour (Alembic) puis s'arrête | — |
 
 ## Démarrage rapide

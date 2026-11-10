@@ -805,7 +805,7 @@ Elle est construite **un écran à la fois** :
 | Étape | Écran | État |
 |---|---|---|
 | 1 | Inscription et connexion | ✅ fait |
-| 2 | Liste des machines, ajout, clé d'API montrée une seule fois | à faire |
+| 2 | Liste des machines, ajout, clé d'API montrée une seule fois | ✅ fait |
 | 3 | Alertes avec acquittement (nom + commentaire) | à faire |
 | 4 | Détail d'une machine : risque, mode de panne, contributions | à faire |
 | 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | à faire |
@@ -849,6 +849,30 @@ copier `frontend/.env.example` en `frontend/.env` et modifier `VITE_API_URL`.
 5. Si l'API répond un jour **401** (jeton expiré au bout de 24 h), l'utilisateur est
    déconnecté automatiquement et voit « Votre session a expiré : reconnectez-vous ».
 
+**Machines (étape 2).** Adresse : `#/machines` (écran ouvert après la connexion).
+1. La page charge **en même temps** la liste (`GET /machines`) et la consommation du plan
+   (`GET /org`), puis affiche par exemple « 1 / 2 machines actives (plan Gratuit) ».
+2. Le formulaire d'ajout n'est montré qu'au **propriétaire et aux administrateurs** ; un
+   membre voit à la place une phrase qui explique pourquoi. Ce n'est qu'un confort :
+   l'API refuse de toute façon (403) une création par un membre. Si la limite du plan
+   est atteinte, le formulaire est remplacé par un message qui dit quoi faire.
+3. `POST /machines` renvoie la machine **avec sa clé complète** : c'est la seule fois
+   (l'API n'en garde que l'empreinte SHA-256). Une fenêtre s'ouvre avec la clé, un bouton
+   **Copier**, et une case « J'ai copié la clé… » : le bouton Fermer (et la touche Échap)
+   ne marche qu'une fois la case cochée, pour qu'on ne perde pas la clé par un clic distrait.
+4. Dans la liste, seul le **début de la clé** est affiché (`maint_CpROeg…`), avec son état
+   (en service / révoquée) : assez pour reconnaître une clé, inutile pour l'utiliser.
+5. Liste vide : un cadre explique ce qu'est une machine et ce qu'on fera de la clé.
+
+**Navigation sans bibliothèque.** L'écran affiché est écrit après le `#` de l'adresse
+(`#/machines`). `src/router.ts` (30 lignes) lit ce `#` et écoute ses changements : le
+bouton « Précédent » marche et recharger la page garde l'écran. Un routeur complet
+(React Router) n'apporterait rien de plus pour 6 écrans.
+
+**Dates.** L'API renvoie des dates UTC sans fuseau (`2026-11-10T23:49:00`). Lue telle
+quelle, JavaScript la prendrait pour une heure *locale* : `parseApiDate` ajoute le `Z`
+(UTC), puis la date est affichée à l'heure et dans la langue de l'utilisateur.
+
 **Erreurs lisibles.** Toute erreur de l'API devient une `ApiError` avec un *type*
 (réseau, non connecté, rôle insuffisant, limite du plan, champ invalide…). L'écran
 affiche une phrase claire pour ce type, puis le message exact du serveur. Si l'API est
@@ -875,8 +899,11 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
   *XSS*). React échappe tout le texte affiché et on n'insère jamais de HTML brut, ce
   qui limite ce risque ; l'alternative (cookie `HttpOnly`) demanderait de changer
   l'authentification de l'API.
-- **Pas de routeur** pour l'instant : un seul écran après connexion. On en ajoutera un
-  minimal quand il y aura plusieurs pages.
+- **Fenêtre native `<dialog>`** pour la clé : le navigateur gère seul le fond grisé,
+  le focus et la touche Échap, sans bibliothèque.
+- **Copie de la clé** : `navigator.clipboard` d'abord ; s'il est refusé (certains
+  navigateurs intégrés), l'ancienne méthode `execCommand("copy")` ; sinon la clé reste
+  sélectionnée et le message dit de faire Ctrl+C.
 - **Le front-end appelle l'API directement** (et non via un proxy de Vite) : c'est ce
   qui se passera en production, et cela vérifie vraiment le réglage CORS.
 
@@ -884,8 +911,12 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 - `npm run build` : TypeScript vérifie tout le code, puis Vite fabrique la version finale.
 - Test de l'API `tests/test_securite.py::test_cors_autorise_le_front_end_react` : le
   front-end est autorisé, un en-tête inconnu est refusé, pas de cookies.
+- Test de l'API `tests/test_cles_api.py::test_nom_de_machine_obligatoire` : un nom de
+  machine vide, fait d'espaces ou trop long est refusé (avant, l'API acceptait un nom vide).
 - Essai réel dans le navigateur contre l'API Docker : inscription, déconnexion,
-  reconnexion, mauvais mot de passe, e-mail déjà utilisé, passage en anglais.
+  reconnexion, mauvais mot de passe, passage en anglais, session expirée ; machines :
+  liste vide, nom vide, ajout, copie de la clé, fermeture bloquée avant la case, limite
+  du plan Gratuit (2/2), deux ajouts d'affilée, largeur de téléphone.
 
 ### 12 bis.7 Fichiers
 | Fichier | Rôle |
@@ -897,8 +928,10 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 | `frontend/src/i18n.tsx` | traductions français / anglais |
 | `frontend/src/components/ui.tsx` | boutons, champs, messages d'erreur, chargement |
 | `frontend/src/pages/AuthPage.tsx` | écran 1 : connexion et inscription |
-| `frontend/src/pages/HomePage.tsx` | accueil après connexion |
-| `frontend/src/App.tsx` | en-tête (langue, déconnexion) et choix de l'écran |
+| `frontend/src/pages/MachinesPage.tsx` | écran 2 : liste et ajout des machines |
+| `frontend/src/components/NewKeyDialog.tsx` | fenêtre qui montre la clé une seule fois |
+| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`) |
+| `frontend/src/App.tsx` | en-tête (menu, langue, déconnexion) et choix de l'écran |
 
 ---
 

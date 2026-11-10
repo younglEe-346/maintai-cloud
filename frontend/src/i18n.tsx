@@ -39,12 +39,6 @@ const fr = {
   "valid.password": "Le mot de passe doit faire au moins 8 caractères.",
   "valid.passwordMatch": "Les deux mots de passe ne sont pas identiques.",
 
-  "home.welcome": "Bienvenue, {name} !",
-  "home.org": "Usine : {org}",
-  "home.role": "Votre rôle : {role}",
-  "home.plan": "Plan : {plan}",
-  "home.soonTitle": "Les autres écrans arrivent",
-  "home.soonText": "Vous êtes bien connecté. Les écrans Machines, Alertes, Réglages et Équipe seront ajoutés aux prochaines étapes.",
   "home.superadminTitle": "Compte super-administrateur",
   "home.superadminText": "Ce compte n'appartient à aucune usine. Pour suivre les usines et les workers, utilisez pour l'instant le tableau de bord Streamlit (http://localhost:8501).",
   "role.owner": "propriétaire",
@@ -52,6 +46,44 @@ const fr = {
   "role.member": "membre",
   "plan.FREE": "Gratuit",
   "plan.PRO": "Pro",
+
+  "nav.machines": "Machines",
+  "header.org": "{org} · {role}",
+
+  "machines.title": "Machines",
+  "machines.intro": "Chaque machine de l'usine envoie ses mesures à MaintAI avec sa propre clé d'API.",
+  "machines.usage": "{count} / {max} machines actives (plan {plan})",
+  "machines.limitReached": "Limite de votre plan atteinte : archivez une machine ou passez au plan Pro pour en ajouter.",
+  "machines.addTitle": "Ajouter une machine",
+  "machines.name": "Nom de la machine",
+  "machines.nameHint": "Par exemple « Tour CN 1 » ou « Fraiseuse atelier B ».",
+  "machines.nameTooLong": "100 caractères maximum.",
+  "machines.add": "Ajouter",
+  "machines.adding": "Ajout…",
+  "machines.memberOnly": "Seuls le propriétaire et les administrateurs peuvent ajouter des machines.",
+  "machines.emptyTitle": "Aucune machine pour l'instant",
+  "machines.emptyText": "Ajoutez votre première machine avec le formulaire ci-dessus. Vous recevrez une clé d'API : c'est elle que le capteur (ou le simulateur) utilise pour envoyer les mesures.",
+  "machines.emptyMember": "Un propriétaire ou un administrateur de l'usine doit d'abord en ajouter une.",
+  "machines.listTitle": "Machines de l'usine",
+  "machines.colName": "Nom",
+  "machines.colStatus": "État",
+  "machines.colKey": "Clé d'API",
+  "machines.colCreated": "Ajoutée le",
+  "machines.keyHelp": "Seul le début de chaque clé est affiché : la clé complète n'est jamais conservée.",
+  "status.ACTIVE": "Active",
+  "status.ARCHIVED": "Archivée",
+  "key.active": "en service",
+  "key.revoked": "révoquée",
+
+  "newKey.title": "Machine « {name} » ajoutée",
+  "newKey.label": "Clé d'API",
+  "newKey.warning": "Copiez cette clé maintenant : elle ne sera plus jamais affichée. Si vous la perdez, il faudra en créer une nouvelle.",
+  "newKey.copy": "Copier",
+  "newKey.copied": "Copiée !",
+  "newKey.copyFailed": "Copie impossible : sélectionnez la clé puis Ctrl+C.",
+  "newKey.howTo": "La machine l'envoie dans l'en-tête x-api-key de chaque lot de mesures (POST /api/v1/mesures).",
+  "newKey.confirm": "J'ai copié la clé et je l'ai rangée en lieu sûr.",
+  "newKey.close": "Fermer",
 
   "error.network": "Impossible de joindre l'API. Vérifiez qu'elle est lancée (docker compose up -d) et qu'elle autorise cette adresse (ALLOWED_ORIGINS).",
   "error.unauthorized": "Vous n'êtes pas connecté ou votre session a expiré.",
@@ -102,12 +134,6 @@ const en: Record<Key, string> = {
   "valid.password": "The password must be at least 8 characters long.",
   "valid.passwordMatch": "The two passwords do not match.",
 
-  "home.welcome": "Welcome, {name}!",
-  "home.org": "Factory: {org}",
-  "home.role": "Your role: {role}",
-  "home.plan": "Plan: {plan}",
-  "home.soonTitle": "More screens are coming",
-  "home.soonText": "You are signed in. The Machines, Alerts, Settings and Team screens will be added in the next steps.",
   "home.superadminTitle": "Super-administrator account",
   "home.superadminText": "This account does not belong to any factory. To monitor factories and workers, use the Streamlit dashboard for now (http://localhost:8501).",
   "role.owner": "owner",
@@ -115,6 +141,44 @@ const en: Record<Key, string> = {
   "role.member": "member",
   "plan.FREE": "Free",
   "plan.PRO": "Pro",
+
+  "nav.machines": "Machines",
+  "header.org": "{org} · {role}",
+
+  "machines.title": "Machines",
+  "machines.intro": "Each machine in the factory sends its measurements to MaintAI with its own API key.",
+  "machines.usage": "{count} / {max} active machines ({plan} plan)",
+  "machines.limitReached": "Your plan's limit is reached: archive a machine or upgrade to the Pro plan to add more.",
+  "machines.addTitle": "Add a machine",
+  "machines.name": "Machine name",
+  "machines.nameHint": "For example \"CNC lathe 1\" or \"Milling machine, shop B\".",
+  "machines.nameTooLong": "100 characters maximum.",
+  "machines.add": "Add",
+  "machines.adding": "Adding…",
+  "machines.memberOnly": "Only the owner and administrators can add machines.",
+  "machines.emptyTitle": "No machines yet",
+  "machines.emptyText": "Add your first machine with the form above. You will get an API key: the sensor (or the simulator) uses it to send measurements.",
+  "machines.emptyMember": "An owner or administrator of the factory must add one first.",
+  "machines.listTitle": "Factory machines",
+  "machines.colName": "Name",
+  "machines.colStatus": "Status",
+  "machines.colKey": "API key",
+  "machines.colCreated": "Added on",
+  "machines.keyHelp": "Only the start of each key is shown: the full key is never stored.",
+  "status.ACTIVE": "Active",
+  "status.ARCHIVED": "Archived",
+  "key.active": "in use",
+  "key.revoked": "revoked",
+
+  "newKey.title": "Machine \"{name}\" added",
+  "newKey.label": "API key",
+  "newKey.warning": "Copy this key now: it will never be shown again. If you lose it, you will have to create a new one.",
+  "newKey.copy": "Copy",
+  "newKey.copied": "Copied!",
+  "newKey.copyFailed": "Copy failed: select the key and press Ctrl+C.",
+  "newKey.howTo": "The machine sends it in the x-api-key header of each batch of measurements (POST /api/v1/mesures).",
+  "newKey.confirm": "I have copied the key and stored it somewhere safe.",
+  "newKey.close": "Close",
 
   "error.network": "Cannot reach the API. Check that it is running (docker compose up -d) and that it allows this address (ALLOWED_ORIGINS).",
   "error.unauthorized": "You are not signed in or your session has expired.",
@@ -133,6 +197,7 @@ const SERVER_MESSAGES_EN: Record<string, string> = {
   "Cet e-mail est déjà utilisé": "This e-mail is already in use",
   "Ce nom d'usine est déjà utilisé": "This factory name is already in use",
   "Identifiants invalides ou session expirée": "Invalid credentials or expired session",
+  "Machine introuvable": "Machine not found",
 };
 
 export type Lang = "fr" | "en";
@@ -152,6 +217,8 @@ interface I18n {
   setLang: (lang: Lang) => void;
   /** Texte traduit ; {nom} est remplacé par vars.nom. */
   t: (key: Key, vars?: Record<string, string>) => string;
+  /** Date et heure dans la langue choisie (ex. 10 nov. 2026, 23:31). */
+  formatDate: (date: Date) => string;
   /** Message lisible pour une erreur (ApiError ou autre). */
   errorText: (error: unknown) => { title: string; detail: string };
 }
@@ -170,6 +237,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const t: I18n["t"] = (key, vars) =>
     DICTS[lang][key].replace(/\{(\w+)\}/g, (_, name: string) => vars?.[name] ?? "");
 
+  const formatDate: I18n["formatDate"] = (date) =>
+    date.toLocaleString(lang === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+
   const errorText: I18n["errorText"] = (error) => {
     if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
     const detail = lang === "en" ? SERVER_MESSAGES_EN[error.detail] ?? error.detail : error.detail;
@@ -178,7 +248,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return { title: t(`error.${error.kind}` as Key), detail };
   };
 
-  return <I18nContext.Provider value={{ lang, setLang, t, errorText }}>{children}</I18nContext.Provider>;
+  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, errorText }}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18n {

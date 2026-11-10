@@ -124,3 +124,45 @@ export const authApi = {
   /** GET /auth/me : qui est connecté. */
   me: () => api<Me>("/auth/me"),
 };
+
+// ---------- Usine : plan et consommation (app/api/v1/organization.py) ----------
+
+export interface Organization {
+  id: string;
+  name: string;
+  my_role: Me["role"];
+  plan: "FREE" | "PRO";
+  plan_label: string;
+  limits: { max_machines: number; max_measures_per_day: number; custom_model: boolean; export: boolean };
+  machines: number;        // machines actives
+  measures_today: number;
+}
+
+export const orgApi = {
+  get: () => api<Organization>("/org"),
+};
+
+// ---------- Machines (app/api/v1/machines.py, schémas MachineResponse / MachineWithKey) ----------
+
+export interface Machine {
+  id: string;
+  name: string;
+  status: "ACTIVE" | "ARCHIVED";
+  created_at: string;
+  api_key_prefix: string;          // début de la clé, pour la reconnaître
+  api_key_created_at: string | null;
+  api_key_revoked_at: string | null;
+}
+
+/** Réponse de création : la seule fois où la clé complète est envoyée. */
+export interface MachineWithKey extends Machine { api_key: string; warning: string; }
+
+export const machinesApi = {
+  list: () => api<Machine[]>("/machines"),
+  create: (name: string) => api<MachineWithKey>("/machines", { method: "POST", body: { json: { name } } }),
+};
+
+/** L'API renvoie des dates UTC sans fuseau ("2026-11-10T23:31:00") : on ajoute le Z. */
+export function parseApiDate(value: string): Date {
+  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`);
+}

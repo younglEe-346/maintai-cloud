@@ -295,9 +295,10 @@ monter K à 2 ou 3 : c'est un réglage par usine.
 nom et un commentaire. Les collègues savent que l'alerte est prise en charge.
 
 **Comment ça fonctionne.** `POST /api/v1/alerts/{id}/acknowledge` avec
-`{"name": "Miloud", "comment": "outil changé"}` :
+`{"comment": "outil changé"}` (le commentaire est facultatif, 2000 caractères au plus) :
 - l'alerte passe de `OPEN` à `ACKNOWLEDGED` (« acquittée ») ; on enregistre le nom, le
-  commentaire et l'heure ;
+  commentaire et l'heure. **Le nom vient du compte connecté**, pas de la requête :
+  personne ne peut acquitter au nom d'un collègue ;
 - une alerte acquittée **reste active** : le risque est toujours là. Elle ne crée pas
   de deuxième alerte et **se ferme seule** quand le risque redescend (hystérésis) ;
 - acquitter une alerte déjà acquittée ou fermée → erreur **409** (conflit) ;
@@ -806,7 +807,7 @@ Elle est construite **un écran à la fois** :
 |---|---|---|
 | 1 | Inscription et connexion | ✅ fait |
 | 2 | Liste des machines, ajout, clé d'API montrée une seule fois | ✅ fait |
-| 3 | Alertes avec acquittement (nom + commentaire) | à faire |
+| 3 | Alertes avec acquittement (nom + commentaire) | ✅ fait |
 | 4 | Détail d'une machine : risque, mode de panne, contributions | à faire |
 | 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | à faire |
 | 6 | Équipe : invitations et rôles | à faire |
@@ -864,6 +865,23 @@ copier `frontend/.env.example` en `frontend/.env` et modifier `VITE_API_URL`.
    (en service / révoquée) : assez pour reconnaître une clé, inutile pour l'utiliser.
 5. Liste vide : un cadre explique ce qu'est une machine et ce qu'on fera de la clé.
 
+**Alertes (étape 3).** Adresse : `#/alerts`.
+1. La page charge en parallèle les alertes actives (`GET /alerts?status=active`), les 20
+   dernières alertes fermées (`status=CLOSED`) et la liste des machines (pour écrire
+   « Tour CN 1 » au lieu d'un identifiant).
+2. Elle **se recharge toute seule toutes les 10 secondes** (et avec le bouton
+   « Actualiser ») : une nouvelle alerte apparaît sans rien toucher. L'heure de la
+   dernière mise à jour est affichée. En quittant la page, le minuteur est arrêté.
+3. Chaque alerte active montre la machine, l'état (ouverte en rouge, acquittée en
+   orange), le risque à l'ouverture, le risque maximal, le dernier risque, le **mode de
+   panne probable** en clair (ex. « surcharge mécanique (OSF) ») et l'explication du modèle.
+4. **Acquitter** ouvre un petit formulaire : « Au nom de » affiche le nom du compte
+   (non modifiable, car c'est l'API qui le prend dans le jeton) et un commentaire
+   facultatif. Tout le monde peut acquitter, y compris un simple membre (technicien).
+5. Si quelqu'un d'autre a acquitté entre-temps, l'API répond **409** : l'écran affiche
+   « Alerte déjà acquittée par … » puis recharge la liste après 3 secondes.
+6. Aucune alerte : un cadre explique que tout va bien et que la page se met à jour seule.
+
 **Navigation sans bibliothèque.** L'écran affiché est écrit après le `#` de l'adresse
 (`#/machines`). `src/router.ts` (30 lignes) lit ce `#` et écoute ses changements : le
 bouton « Précédent » marche et recharger la page garde l'écran. Un routeur complet
@@ -916,7 +934,10 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 - Essai réel dans le navigateur contre l'API Docker : inscription, déconnexion,
   reconnexion, mauvais mot de passe, passage en anglais, session expirée ; machines :
   liste vide, nom vide, ajout, copie de la clé, fermeture bloquée avant la case, limite
-  du plan Gratuit (2/2), deux ajouts d'affilée, largeur de téléphone.
+  du plan Gratuit (2/2), deux ajouts d'affilée, largeur de téléphone ; alertes : vraies
+  alertes créées par le worker à partir de lignes AI4I en panne (PWF, OSF), apparition
+  automatique d'une nouvelle alerte, acquittement avec commentaire, conflit 409 (alerte
+  acquittée par quelqu'un d'autre juste avant), historique, anglais, téléphone.
 
 ### 12 bis.7 Fichiers
 | Fichier | Rôle |
@@ -930,7 +951,8 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 | `frontend/src/pages/AuthPage.tsx` | écran 1 : connexion et inscription |
 | `frontend/src/pages/MachinesPage.tsx` | écran 2 : liste et ajout des machines |
 | `frontend/src/components/NewKeyDialog.tsx` | fenêtre qui montre la clé une seule fois |
-| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`) |
+| `frontend/src/pages/AlertsPage.tsx` | écran 3 : alertes actives, acquittement, historique |
+| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`, `#/alerts`) |
 | `frontend/src/App.tsx` | en-tête (menu, langue, déconnexion) et choix de l'écran |
 
 ---

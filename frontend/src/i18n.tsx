@@ -85,6 +85,54 @@ const fr = {
   "newKey.confirm": "J'ai copié la clé et je l'ai rangée en lieu sûr.",
   "newKey.close": "Fermer",
 
+  "nav.alerts": "Alertes",
+  "common.refresh": "Actualiser",
+  "common.updatedAt": "Mis à jour à {time}",
+  "common.cancel": "Annuler",
+
+  "alerts.title": "Alertes",
+  "alerts.intro": "Une alerte s'ouvre toute seule quand le risque de panne d'une machine dépasse le seuil, et se ferme toute seule quand il redescend. Acquitter, c'est dire à l'équipe : « je l'ai vue, je m'en occupe ».",
+  "alerts.activeTitle": "Alertes actives",
+  "alerts.historyTitle": "Historique (alertes fermées)",
+  "alerts.emptyActiveTitle": "Aucune alerte active",
+  "alerts.emptyActiveText": "Toutes les machines sont sous le seuil de risque. Cette page se met à jour toute seule toutes les 10 secondes.",
+  "alerts.emptyHistory": "Aucune alerte fermée pour l'instant.",
+  "alerts.status.OPEN": "Ouverte",
+  "alerts.status.ACKNOWLEDGED": "Acquittée",
+  "alerts.status.CLOSED": "Fermée",
+  "alerts.unknownMachine": "Machine inconnue",
+  "alerts.openedAt": "Ouverte le {date}",
+  "alerts.closedAt": "Fermée le {date}",
+  "alerts.riskOpen": "Risque à l'ouverture",
+  "alerts.riskPeak": "Risque maximal",
+  "alerts.riskLast": "Dernier risque",
+  "alerts.mode": "Mode de panne probable",
+  "alerts.details": "Explication du modèle :",
+  "alerts.ackBy": "Prise en charge par {name} le {date}",
+  "alerts.ackComment": "Commentaire : {comment}",
+  "alerts.ackButton": "Acquitter",
+  "alerts.ackFormTitle": "Acquitter cette alerte",
+  "alerts.ackAs": "Au nom de",
+  "alerts.ackAsHint": "Le nom vient de votre compte : personne ne peut acquitter au nom d'un autre.",
+  "alerts.comment": "Commentaire (facultatif)",
+  "alerts.commentHint": "Ce que vous avez constaté ou fait, par exemple « outil changé ». 2000 caractères maximum.",
+  "alerts.commentTooLong": "2000 caractères maximum.",
+  "alerts.ackConfirm": "Confirmer l'acquittement",
+  "alerts.acking": "Envoi…",
+  "alerts.ackStaysActive": "Une alerte acquittée reste active tant que le risque est élevé : elle se fermera toute seule.",
+  "alerts.colMachine": "Machine",
+  "alerts.colOpened": "Ouverte le",
+  "alerts.colClosed": "Fermée le",
+  "alerts.colPeak": "Risque max.",
+  "alerts.colMode": "Mode",
+  "alerts.colAck": "Prise en charge",
+  "mode.TWF": "usure de l'outil (TWF)",
+  "mode.HDF": "mauvaise dissipation de la chaleur (HDF)",
+  "mode.PWF": "puissance hors limites (PWF)",
+  "mode.OSF": "surcharge mécanique (OSF)",
+  "mode.RNF": "panne aléatoire (RNF)",
+  "mode.none": "non déterminé",
+
   "error.network": "Impossible de joindre l'API. Vérifiez qu'elle est lancée (docker compose up -d) et qu'elle autorise cette adresse (ALLOWED_ORIGINS).",
   "error.unauthorized": "Vous n'êtes pas connecté ou votre session a expiré.",
   "error.forbidden": "Votre rôle ne permet pas cette action.",
@@ -180,6 +228,54 @@ const en: Record<Key, string> = {
   "newKey.confirm": "I have copied the key and stored it somewhere safe.",
   "newKey.close": "Close",
 
+  "nav.alerts": "Alerts",
+  "common.refresh": "Refresh",
+  "common.updatedAt": "Updated at {time}",
+  "common.cancel": "Cancel",
+
+  "alerts.title": "Alerts",
+  "alerts.intro": "An alert opens by itself when a machine's failure risk goes above the threshold, and closes by itself when it goes back down. Acknowledging tells the team: \"I have seen it, I am on it\".",
+  "alerts.activeTitle": "Active alerts",
+  "alerts.historyTitle": "History (closed alerts)",
+  "alerts.emptyActiveTitle": "No active alerts",
+  "alerts.emptyActiveText": "All machines are below the risk threshold. This page refreshes by itself every 10 seconds.",
+  "alerts.emptyHistory": "No closed alerts yet.",
+  "alerts.status.OPEN": "Open",
+  "alerts.status.ACKNOWLEDGED": "Acknowledged",
+  "alerts.status.CLOSED": "Closed",
+  "alerts.unknownMachine": "Unknown machine",
+  "alerts.openedAt": "Opened on {date}",
+  "alerts.closedAt": "Closed on {date}",
+  "alerts.riskOpen": "Risk when opened",
+  "alerts.riskPeak": "Peak risk",
+  "alerts.riskLast": "Latest risk",
+  "alerts.mode": "Probable failure mode",
+  "alerts.details": "Model explanation:",
+  "alerts.ackBy": "Handled by {name} on {date}",
+  "alerts.ackComment": "Comment: {comment}",
+  "alerts.ackButton": "Acknowledge",
+  "alerts.ackFormTitle": "Acknowledge this alert",
+  "alerts.ackAs": "On behalf of",
+  "alerts.ackAsHint": "The name comes from your account: nobody can acknowledge on someone else's behalf.",
+  "alerts.comment": "Comment (optional)",
+  "alerts.commentHint": "What you noticed or did, for example \"tool replaced\". 2000 characters maximum.",
+  "alerts.commentTooLong": "2000 characters maximum.",
+  "alerts.ackConfirm": "Confirm acknowledgement",
+  "alerts.acking": "Sending…",
+  "alerts.ackStaysActive": "An acknowledged alert stays active while the risk is high: it will close by itself.",
+  "alerts.colMachine": "Machine",
+  "alerts.colOpened": "Opened on",
+  "alerts.colClosed": "Closed on",
+  "alerts.colPeak": "Peak risk",
+  "alerts.colMode": "Mode",
+  "alerts.colAck": "Handled by",
+  "mode.TWF": "tool wear (TWF)",
+  "mode.HDF": "poor heat dissipation (HDF)",
+  "mode.PWF": "power out of range (PWF)",
+  "mode.OSF": "mechanical overstrain (OSF)",
+  "mode.RNF": "random failure (RNF)",
+  "mode.none": "not determined",
+
   "error.network": "Cannot reach the API. Check that it is running (docker compose up -d) and that it allows this address (ALLOWED_ORIGINS).",
   "error.unauthorized": "You are not signed in or your session has expired.",
   "error.forbidden": "Your role does not allow this action.",
@@ -198,7 +294,22 @@ const SERVER_MESSAGES_EN: Record<string, string> = {
   "Ce nom d'usine est déjà utilisé": "This factory name is already in use",
   "Identifiants invalides ou session expirée": "Invalid credentials or expired session",
   "Machine introuvable": "Machine not found",
+  "Alerte introuvable": "Alert not found",
+  "Alerte déjà fermée": "Alert already closed",
 };
+
+// Messages qui contiennent une partie variable (un nom…).
+const SERVER_PATTERNS_EN: [RegExp, string][] = [
+  [/^Alerte déjà acquittée par (.*)$/, "Alert already acknowledged by $1"],
+];
+
+function translateServerMessage(message: string): string {
+  if (SERVER_MESSAGES_EN[message]) return SERVER_MESSAGES_EN[message];
+  for (const [pattern, english] of SERVER_PATTERNS_EN) {
+    if (pattern.test(message)) return message.replace(pattern, english);
+  }
+  return message;
+}
 
 export type Lang = "fr" | "en";
 const DICTS: Record<Lang, Record<Key, string>> = { fr, en };
@@ -219,6 +330,10 @@ interface I18n {
   t: (key: Key, vars?: Record<string, string>) => string;
   /** Date et heure dans la langue choisie (ex. 10 nov. 2026, 23:31). */
   formatDate: (date: Date) => string;
+  /** Heure seule (ex. 23:31:05). */
+  formatTime: (date: Date) => string;
+  /** Pourcentage (0,987 -> 98,7 %). */
+  formatPercent: (value: number) => string;
   /** Message lisible pour une erreur (ApiError ou autre). */
   errorText: (error: unknown) => { title: string; detail: string };
 }
@@ -240,15 +355,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const formatDate: I18n["formatDate"] = (date) =>
     date.toLocaleString(lang === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 
+  const locale = lang === "fr" ? "fr-FR" : "en-GB";
+  const formatTime: I18n["formatTime"] = (date) => date.toLocaleTimeString(locale);
+  const formatPercent: I18n["formatPercent"] = (value) =>
+    value.toLocaleString(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
   const errorText: I18n["errorText"] = (error) => {
     if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
-    const detail = lang === "en" ? SERVER_MESSAGES_EN[error.detail] ?? error.detail : error.detail;
+    const detail = lang === "en" ? translateServerMessage(error.detail) : error.detail;
     // Refus simple (400) avec une explication du serveur : l'explication suffit comme titre.
     if (error.kind === "other" && detail) return { title: detail, detail: "" };
     return { title: t(`error.${error.kind}` as Key), detail };
   };
 
-  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, errorText }}>{children}</I18nContext.Provider>;
+  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, formatTime, formatPercent, errorText }}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18n {

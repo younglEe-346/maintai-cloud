@@ -162,6 +162,36 @@ export const machinesApi = {
   create: (name: string) => api<MachineWithKey>("/machines", { method: "POST", body: { json: { name } } }),
 };
 
+// ---------- Alertes (app/api/v1/alerts.py, schéma AlertResponse) ----------
+
+export type FailureMode = "TWF" | "HDF" | "PWF" | "OSF" | "RNF";
+
+export interface Alert {
+  id: string;
+  machine_id: string;
+  status: "OPEN" | "ACKNOWLEDGED" | "CLOSED";
+  risk_score: number;              // risque à l'ouverture (0 à 1)
+  peak_risk_score: number | null;  // risque maximal pendant l'alerte
+  last_risk_score: number | null;  // dernier risque reçu
+  probable_mode: FailureMode | null;
+  details: string | null;          // explication écrite par le worker (en français)
+  model_version: string | null;
+  created_at: string;
+  closed_at: string | null;
+  acknowledged_at: string | null;
+  acknowledged_by_name: string | null;
+  ack_comment: string | null;
+}
+
+export const alertsApi = {
+  /** status=active : ouvertes ou acquittées ; CLOSED : historique. */
+  list: (status: "active" | "CLOSED", limit = 50) =>
+    api<Alert[]>(`/alerts?status=${status}&limit=${limit}`),
+  /** Le nom de la personne qui acquitte vient de son compte (côté API), seul le commentaire est envoyé. */
+  acknowledge: (id: string, comment: string) =>
+    api<Alert>(`/alerts/${encodeURIComponent(id)}/acknowledge`, { method: "POST", body: { json: { comment } } }),
+};
+
 /** L'API renvoie des dates UTC sans fuseau ("2026-11-10T23:31:00") : on ajoute le Z. */
 export function parseApiDate(value: string): Date {
   return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`);

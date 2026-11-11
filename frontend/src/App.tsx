@@ -4,11 +4,13 @@ import { useI18n, type TranslationKey } from "./i18n";
 import { hrefFor, useRoute, type Route } from "./router";
 import { Button, Notice, Spinner } from "./components/ui";
 import AuthPage from "./pages/AuthPage";
+import AlertsPage from "./pages/AlertsPage";
 import MachinesPage from "./pages/MachinesPage";
 
 // Menu : un écran sera ajouté ici à chaque étape.
 const MENU: { route: Route; label: TranslationKey }[] = [
   { route: { page: "machines" }, label: "nav.machines" },
+  { route: { page: "alerts" }, label: "nav.alerts" },
 ];
 
 function LangSwitch() {
@@ -24,6 +26,7 @@ function LangSwitch() {
 function Page({ route }: { route: Route }) {
   switch (route.page) {
     case "machines": return <MachinesPage />;
+    case "alerts": return <AlertsPage />;
   }
 }
 

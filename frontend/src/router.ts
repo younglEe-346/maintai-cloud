@@ -3,7 +3,7 @@
 // et recharger la page garde l'écran ouvert.
 import { useEffect, useState } from "react";
 
-export type Route = { page: "machines" };
+export type Route = { page: "machines" } | { page: "alerts" };
 
 const DEFAULT_ROUTE: Route = { page: "machines" };
 
@@ -11,6 +11,7 @@ export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   switch (parts[0]) {
     case "machines": return { page: "machines" };
+    case "alerts": return { page: "alerts" };
     default: return DEFAULT_ROUTE;
   }
 }

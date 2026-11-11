@@ -1,4 +1,5 @@
 """Réception des mesures : validation, déduplication, quarantaine, calcul du risque."""
+import pytest
 from helpers import API, ai4i_rows, create_machine, register, send
 
 
@@ -22,6 +23,12 @@ def test_lot_valide_accepte_et_risque_calcule(client):
     panne = next(m for m in mesures if m["message_id"] == rows[2]["message_id"])
     assert panne["prediction"]["decision"] is True
     assert panne["prediction"]["probable_mode"] == "PWF"
+    # détail pour l'écran d'une machine : probabilités des modes, contributions qui s'additionnent
+    pred = panne["prediction"]
+    assert max(pred["mode_probabilities"], key=pred["mode_probabilities"].get) == "PWF"
+    assert "PWF" in pred["flagged_modes"]
+    assert pred["base_risk"] + sum(pred["contributions"].values()) == pytest.approx(pred["risk_score"], abs=1e-6)
+    assert set(pred["reference"]) == set(pred["contributions"])
 
 
 def test_deduplication_par_message_id(client):

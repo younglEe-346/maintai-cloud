@@ -133,6 +133,46 @@ const fr = {
   "mode.RNF": "panne aléatoire (RNF)",
   "mode.none": "non déterminé",
 
+  "machines.openHint": "Cliquez sur le nom d'une machine pour voir son risque.",
+  "detail.back": "← Toutes les machines",
+  "detail.notFound": "Machine introuvable : elle n'existe pas ou appartient à une autre usine.",
+  "detail.keyPrefix": "Clé : {prefix}…",
+  "detail.chartTitle": "Risque de panne des {n} dernières mesures",
+  "detail.chartHelp": "Chaque point est une mesure, de la plus ancienne (à gauche) à la plus récente (à droite). Au-dessus de la ligne pointillée (le seuil), le modèle alerte. Cliquez sur un point pour voir son détail.",
+  "detail.threshold": "seuil {value}",
+  "detail.chartAria": "Graphique du risque : {n} mesures, dernier risque {last}, seuil {threshold}.",
+  "detail.older": "plus ancienne",
+  "detail.newer": "plus récente",
+  "detail.prev": "← Précédente",
+  "detail.next": "Suivante →",
+  "detail.latest": "Dernière",
+  "detail.selected": "Mesure du {date} ({pos} sur {n})",
+  "detail.risk": "Risque de panne",
+  "detail.above": "Au-dessus du seuil ({threshold}) : le modèle alerte.",
+  "detail.below": "Sous le seuil ({threshold}) : fonctionnement normal.",
+  "detail.model": "Modèle : {version}",
+  "detail.modeTitle": "Mode de panne probable",
+  "detail.modeNone": "Aucun : le risque est sous le seuil, il n'y a pas de panne à expliquer.",
+  "detail.modeHelp": "Probabilité de chaque type de panne pour cette mesure. Un mode en gras dépasse son propre seuil.",
+  "detail.modesUnavailable": "Ce modèle ne calcule pas les modes de panne.",
+  "detail.contribTitle": "Ce qui fait monter ou baisser le risque",
+  "detail.contribHelp": "Une machine normale a un risque de {base}. Chaque mesure ajoute (rouge) ou retire (vert) des points ; le total donne le risque de cette mesure : {risk}.",
+  "detail.contribUnavailable": "Ce modèle ne calcule pas les contributions.",
+  "detail.colSensor": "Mesure",
+  "detail.colValue": "Valeur",
+  "detail.colNormal": "Normal",
+  "detail.colEffect": "Effet sur le risque",
+  "detail.points": "{value} pts",
+  "detail.pending": "Mesures en cours de calcul par le worker : {n}.",
+  "detail.emptyTitle": "Aucune mesure pour l'instant",
+  "detail.emptyText": "Cette machine n'a encore rien envoyé. Elle doit envoyer ses mesures avec sa clé d'API (POST /api/v1/mesures), par exemple avec le simulateur. Cette page se met à jour toute seule.",
+  "sensor.air_temp": "Température de l'air",
+  "sensor.process_temp": "Température du process",
+  "sensor.rotational_speed": "Vitesse de rotation",
+  "sensor.torque": "Couple",
+  "sensor.tool_wear": "Usure de l'outil",
+  "unit.rotational_speed": "tr/min",
+
   "error.network": "Impossible de joindre l'API. Vérifiez qu'elle est lancée (docker compose up -d) et qu'elle autorise cette adresse (ALLOWED_ORIGINS).",
   "error.unauthorized": "Vous n'êtes pas connecté ou votre session a expiré.",
   "error.forbidden": "Votre rôle ne permet pas cette action.",
@@ -276,6 +316,46 @@ const en: Record<Key, string> = {
   "mode.RNF": "random failure (RNF)",
   "mode.none": "not determined",
 
+  "machines.openHint": "Click a machine's name to see its risk.",
+  "detail.back": "← All machines",
+  "detail.notFound": "Machine not found: it does not exist or belongs to another factory.",
+  "detail.keyPrefix": "Key: {prefix}…",
+  "detail.chartTitle": "Failure risk of the last {n} measurements",
+  "detail.chartHelp": "Each dot is a measurement, from the oldest (left) to the most recent (right). Above the dashed line (the threshold), the model raises an alert. Click a dot to see its details.",
+  "detail.threshold": "threshold {value}",
+  "detail.chartAria": "Risk chart: {n} measurements, latest risk {last}, threshold {threshold}.",
+  "detail.older": "oldest",
+  "detail.newer": "most recent",
+  "detail.prev": "← Previous",
+  "detail.next": "Next →",
+  "detail.latest": "Latest",
+  "detail.selected": "Measurement of {date} ({pos} of {n})",
+  "detail.risk": "Failure risk",
+  "detail.above": "Above the threshold ({threshold}): the model raises an alert.",
+  "detail.below": "Below the threshold ({threshold}): normal operation.",
+  "detail.model": "Model: {version}",
+  "detail.modeTitle": "Probable failure mode",
+  "detail.modeNone": "None: the risk is below the threshold, there is no failure to explain.",
+  "detail.modeHelp": "Probability of each failure type for this measurement. A mode in bold is above its own threshold.",
+  "detail.modesUnavailable": "This model does not compute failure modes.",
+  "detail.contribTitle": "What raises or lowers the risk",
+  "detail.contribHelp": "A normal machine has a risk of {base}. Each measurement adds (red) or removes (green) points; the total gives this measurement's risk: {risk}.",
+  "detail.contribUnavailable": "This model does not compute contributions.",
+  "detail.colSensor": "Measurement",
+  "detail.colValue": "Value",
+  "detail.colNormal": "Normal",
+  "detail.colEffect": "Effect on risk",
+  "detail.points": "{value} pts",
+  "detail.pending": "Measurements still being processed by the worker: {n}.",
+  "detail.emptyTitle": "No measurements yet",
+  "detail.emptyText": "This machine has not sent anything yet. It must send its measurements with its API key (POST /api/v1/mesures), for example with the simulator. This page refreshes by itself.",
+  "sensor.air_temp": "Air temperature",
+  "sensor.process_temp": "Process temperature",
+  "sensor.rotational_speed": "Rotational speed",
+  "sensor.torque": "Torque",
+  "sensor.tool_wear": "Tool wear",
+  "unit.rotational_speed": "rpm",
+
   "error.network": "Cannot reach the API. Check that it is running (docker compose up -d) and that it allows this address (ALLOWED_ORIGINS).",
   "error.unauthorized": "You are not signed in or your session has expired.",
   "error.forbidden": "Your role does not allow this action.",
@@ -334,6 +414,8 @@ interface I18n {
   formatTime: (date: Date) => string;
   /** Pourcentage (0,987 -> 98,7 %). */
   formatPercent: (value: number) => string;
+  /** Nombre dans la langue choisie (ex. 39,9 ou 39.9). */
+  formatNumber: (value: number, maxDigits?: number) => string;
   /** Message lisible pour une erreur (ApiError ou autre). */
   errorText: (error: unknown) => { title: string; detail: string };
 }
@@ -360,6 +442,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const formatPercent: I18n["formatPercent"] = (value) =>
     value.toLocaleString(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
+  const formatNumber: I18n["formatNumber"] = (value, maxDigits = 1) =>
+    value.toLocaleString(locale, { maximumFractionDigits: maxDigits });
+
   const errorText: I18n["errorText"] = (error) => {
     if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
     const detail = lang === "en" ? translateServerMessage(error.detail) : error.detail;
@@ -368,7 +453,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return { title: t(`error.${error.kind}` as Key), detail };
   };
 
-  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, formatTime, formatPercent, errorText }}>{children}</I18nContext.Provider>;
+  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, formatTime, formatPercent, formatNumber, errorText }}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18n {

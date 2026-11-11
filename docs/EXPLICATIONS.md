@@ -808,7 +808,7 @@ Elle est construite **un écran à la fois** :
 | 1 | Inscription et connexion | ✅ fait |
 | 2 | Liste des machines, ajout, clé d'API montrée une seule fois | ✅ fait |
 | 3 | Alertes avec acquittement (nom + commentaire) | ✅ fait |
-| 4 | Détail d'une machine : risque, mode de panne, contributions | à faire |
+| 4 | Détail d'une machine : risque, mode de panne, contributions | ✅ fait |
 | 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | à faire |
 | 6 | Équipe : invitations et rôles | à faire |
 
@@ -832,6 +832,10 @@ cd frontend
 npm install        # une seule fois : télécharge React, Vite, Tailwind dans node_modules/
 npm run dev        # ouvre http://localhost:5173
 ```
+Si une mise en forme manque après l'ajout d'un nouveau fichier (le projet est sur
+OneDrive, qui peut gêner la surveillance des fichiers), arrêter `npm run dev` (Ctrl+C)
+et le relancer.
+
 L'adresse de l'API est `http://localhost:8000/api/v1` par défaut ; pour la changer,
 copier `frontend/.env.example` en `frontend/.env` et modifier `VITE_API_URL`.
 
@@ -881,6 +885,37 @@ copier `frontend/.env.example` en `frontend/.env` et modifier `VITE_API_URL`.
 5. Si quelqu'un d'autre a acquitté entre-temps, l'API répond **409** : l'écran affiche
    « Alerte déjà acquittée par … » puis recharge la liste après 3 secondes.
 6. Aucune alerte : un cadre explique que tout va bien et que la page se met à jour seule.
+
+**Détail d'une machine (étape 4).** Adresse : `#/machines/<identifiant>` (clic sur le
+nom d'une machine dans la liste).
+1. La page charge les 200 dernières mesures avec leur prédiction
+   (`GET /machines/{id}/mesures`) et se recharge toute seule toutes les 10 secondes.
+2. **Graphique du risque** : un point par mesure, de la plus ancienne (à gauche) à la
+   plus récente (à droite), de 0 à 100 %. La ligne pointillée rouge est le **seuil** ;
+   les points au-dessus sont rouges (le modèle alerte). Le graphique est dessiné en SVG
+   à la main (`RiskChart.tsx`, environ 80 lignes) : une bibliothèque de graphiques
+   pèserait plus lourd que tout le reste de l'application pour une seule courbe.
+3. On choisit une mesure en **cliquant sur le graphique** ou avec les boutons
+   Précédente / Suivante / Dernière (utilisables au clavier). Par défaut, c'est la plus
+   récente. La mesure choisie est retenue par son identifiant : quand de nouvelles
+   mesures arrivent, la sélection ne saute pas sur une autre.
+4. Pour cette mesure : le **risque** (vert sous le seuil, rouge au-dessus) ; le **mode de
+   panne probable** et la probabilité de chacun des 4 modes prédictibles (barres ; en gras
+   ceux qui dépassent leur propre seuil) ; les **contributions** de chaque mesure.
+5. **Lire les contributions.** Une machine « normale » (valeurs de référence) a un risque
+   de base. Chaque mesure ajoute des points (barre rouge, à droite) ou en retire (barre
+   verte, à gauche) ; base + somme des points = risque affiché. Exemple réel (ligne AI4I
+   161, panne OSF) : usure de l'outil 218 min au lieu de 107 → +38,8 pts ; couple 52,3 N·m
+   au lieu de 39,9 → +32,4 pts ; … total 87,0 %. Ce sont les valeurs de Shapley de la
+   section 1.
+6. Machine sans mesure : un cadre explique comment en envoyer. Identifiant inconnu (ou
+   machine d'une autre usine) : « Machine introuvable ».
+
+**Ajout à l'API pour cet écran.** `GET /machines/{id}/mesures` renvoyait déjà le risque,
+le seuil, le mode probable et les contributions. Il renvoie maintenant aussi ce que le
+worker avait déjà calculé et gardé en base : `mode_probabilities` (probabilité de chaque
+mode), `flagged_modes`, `base_risk` (risque d'une machine normale) et `reference`
+(valeurs normales). Rien n'est retiré : le tableau de bord Streamlit marche toujours.
 
 **Navigation sans bibliothèque.** L'écran affiché est écrit après le `#` de l'adresse
 (`#/machines`). `src/router.ts` (30 lignes) lit ce `#` et écoute ses changements : le
@@ -937,7 +972,12 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
   du plan Gratuit (2/2), deux ajouts d'affilée, largeur de téléphone ; alertes : vraies
   alertes créées par le worker à partir de lignes AI4I en panne (PWF, OSF), apparition
   automatique d'une nouvelle alerte, acquittement avec commentaire, conflit 409 (alerte
-  acquittée par quelqu'un d'autre juste avant), historique, anglais, téléphone.
+  acquittée par quelqu'un d'autre juste avant), historique, anglais, téléphone ; détail
+  d'une machine : courbe de 61 vraies mesures AI4I (3 pannes visibles), clic sur un pic
+  (OSF, contributions dont la somme redonne le risque), sélection gardée quand de
+  nouvelles mesures arrivent, machine sans mesure, identifiant inconnu, anglais, téléphone.
+- Test de l'API `tests/test_mesures.py::test_lot_valide_accepte_et_risque_calcule` : probabilités
+  des modes (PWF en tête pour une panne PWF), et base + contributions = risque.
 
 ### 12 bis.7 Fichiers
 | Fichier | Rôle |
@@ -952,7 +992,9 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 | `frontend/src/pages/MachinesPage.tsx` | écran 2 : liste et ajout des machines |
 | `frontend/src/components/NewKeyDialog.tsx` | fenêtre qui montre la clé une seule fois |
 | `frontend/src/pages/AlertsPage.tsx` | écran 3 : alertes actives, acquittement, historique |
-| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`, `#/alerts`) |
+| `frontend/src/pages/MachineDetailPage.tsx` | écran 4 : détail d'une machine |
+| `frontend/src/components/RiskChart.tsx` | graphique du risque en SVG |
+| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`, `#/machines/<id>`, `#/alerts`) |
 | `frontend/src/App.tsx` | en-tête (menu, langue, déconnexion) et choix de l'écran |
 
 ---

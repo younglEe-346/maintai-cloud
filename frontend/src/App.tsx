@@ -1,10 +1,11 @@
 // Squelette de l'application : en-tête (menu, langue, déconnexion) + écran choisi dans l'adresse (#/...).
 import { useAuth } from "./auth";
 import { useI18n, type TranslationKey } from "./i18n";
-import { hrefFor, useRoute, type Route } from "./router";
+import { hrefFor, menuPage, useRoute, type Route } from "./router";
 import { Button, Notice, Spinner } from "./components/ui";
 import AuthPage from "./pages/AuthPage";
 import AlertsPage from "./pages/AlertsPage";
+import MachineDetailPage from "./pages/MachineDetailPage";
 import MachinesPage from "./pages/MachinesPage";
 
 // Menu : un écran sera ajouté ici à chaque étape.
@@ -26,6 +27,7 @@ function LangSwitch() {
 function Page({ route }: { route: Route }) {
   switch (route.page) {
     case "machines": return <MachinesPage />;
+    case "machine": return <MachineDetailPage key={route.id} id={route.id} />;
     case "alerts": return <AlertsPage />;
   }
 }
@@ -58,8 +60,8 @@ export default function App() {
               <nav className="flex gap-4 text-sm">
                 {MENU.map((item) => (
                   <a key={item.route.page} href={hrefFor(item.route)}
-                    aria-current={route.page === item.route.page ? "page" : undefined}
-                    className={route.page === item.route.page
+                    aria-current={menuPage(route) === item.route.page ? "page" : undefined}
+                    className={menuPage(route) === item.route.page
                       ? "font-semibold text-blue-700" : "text-slate-600 hover:text-slate-900"}>
                     {t(item.label)}
                   </a>

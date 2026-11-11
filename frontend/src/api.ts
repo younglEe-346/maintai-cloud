@@ -142,6 +142,8 @@ export const orgApi = {
   get: () => api<Organization>("/org"),
 };
 
+export type FailureMode = "TWF" | "HDF" | "PWF" | "OSF" | "RNF";
+
 // ---------- Machines (app/api/v1/machines.py, schémas MachineResponse / MachineWithKey) ----------
 
 export interface Machine {
@@ -157,14 +159,42 @@ export interface Machine {
 /** Réponse de création : la seule fois où la clé complète est envoyée. */
 export interface MachineWithKey extends Machine { api_key: string; warning: string; }
 
+/** Les 5 mesures envoyées par une machine (app/ml/features.py, RAW_FEATURES). */
+export const SENSORS = ["air_temp", "process_temp", "rotational_speed", "torque", "tool_wear"] as const;
+export type Sensor = typeof SENSORS[number];
+
+export interface Prediction {
+  risk_score: number;               // 0 à 1
+  decision: boolean;                // vrai si risque >= seuil
+  threshold: number;
+  model_version: string;
+  probable_mode: FailureMode | null;                           // seulement si décision = alerte
+  mode_probabilities: Partial<Record<FailureMode, number>> | null;
+  flagged_modes: FailureMode[] | null;                         // modes au-dessus de leur propre seuil
+  explanation: string | null;
+  contributions: Record<Sensor, number> | null;                // + = fait monter le risque
+  base_risk: number | null;                                    // risque d'une machine normale
+  reference: Record<Sensor, number> | null;                    // valeurs normales
+}
+
+export interface Measure extends Record<Sensor, number> {
+  id: string;
+  message_id: string;
+  timestamp: string;
+  label_failure: boolean | null;
+  label_modes: FailureMode[] | null;
+  prediction: Prediction | null;    // null tant que le worker n'a pas calculé
+}
+
 export const machinesApi = {
   list: () => api<Machine[]>("/machines"),
+  /** Dernières mesures, les plus récentes d'abord, avec leur prédiction. */
+  measures: (id: string, limit = 200) =>
+    api<Measure[]>(`/machines/${encodeURIComponent(id)}/mesures?limit=${limit}`),
   create: (name: string) => api<MachineWithKey>("/machines", { method: "POST", body: { json: { name } } }),
 };
 
 // ---------- Alertes (app/api/v1/alerts.py, schéma AlertResponse) ----------
-
-export type FailureMode = "TWF" | "HDF" | "PWF" | "OSF" | "RNF";
 
 export interface Alert {
   id: string;

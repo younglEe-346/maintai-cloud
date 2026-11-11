@@ -9,6 +9,7 @@ import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { Button, ErrorBox, Field, Notice, Spinner } from "../components/ui";
 import NewKeyDialog from "../components/NewKeyDialog";
+import { hrefFor } from "../router";
 
 export default function MachinesPage() {
   const { t } = useI18n();
@@ -142,7 +143,9 @@ function MachineTable({ machines }: { machines: Machine[] }) {
           <tbody>
             {machines.map((m) => (
               <tr key={m.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2 font-medium">{m.name}</td>
+                <td className="px-4 py-2 font-medium">
+                  <a href={hrefFor({ page: "machine", id: m.id })} className="text-blue-700 hover:underline">{m.name}</a>
+                </td>
                 <td className="px-4 py-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs ${
                     m.status === "ACTIVE" ? "bg-green-100 text-green-800" : "bg-slate-200 text-slate-600"}`}>
@@ -161,7 +164,7 @@ function MachineTable({ machines }: { machines: Machine[] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-500">{t("machines.keyHelp")}</p>
+      <p className="text-xs text-slate-500">{t("machines.openHint")} {t("machines.keyHelp")}</p>
     </div>
   );
 }

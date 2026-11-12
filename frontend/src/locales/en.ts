@@ -91,6 +91,24 @@ export const en: Record<TranslationKey, string> = {
   "common.refresh": "Refresh",
   "common.updatedAt": "Updated at {time}",
   "common.cancel": "Cancel",
+  "common.areYouSure": "Are you sure?",
+  "common.working": "Working…",
+  "manage.title": "Manage the machine",
+  "manage.intro": "Owner and administrators only.",
+  "manage.rotate": "Replace the API key",
+  "manage.rotateHelp": "A new key is created and shown only once; the old one stops working immediately. Do this if the key was lost or leaked, then copy it into the machine's box.",
+  "manage.rotateConfirm": "Yes, replace the key",
+  "manage.revoke": "Revoke the key",
+  "manage.revokeHelp": "The key is blocked immediately (for example if the box was stolen): measurements sent with it will be refused. You can create a new key afterwards.",
+  "manage.revokeConfirm": "Yes, revoke",
+  "manage.archive": "Archive the machine",
+  "manage.archiveHelp": "The machine will no longer send measurements and frees a slot in your plan. Its history (measurements, alerts) is kept. There is no button to unarchive it.",
+  "manage.archiveConfirm": "Yes, archive",
+  "manage.revokedNotice": "Key revoked on {date}: this machine can no longer send measurements. Replace the key to put it back in service.",
+  "manage.archivedNotice": "Archived machine: it no longer sends measurements. Its history is still available below.",
+  "manage.revokeDone": "Key revoked.",
+  "manage.archiveDone": "Machine archived.",
+  "newKey.rotatedTitle": "New key for \"{name}\"",
 
   "alerts.title": "Alerts",
   "alerts.intro": "An alert opens by itself when a machine's failure risk goes above the threshold, and closes by itself when it goes back down. Acknowledging tells the team: \"I have seen it, I am on it\".",
@@ -195,6 +213,7 @@ export const SERVER_MESSAGES_EN: Record<string, string> = {
   "Machine introuvable": "Machine not found",
   "Alerte introuvable": "Alert not found",
   "Alerte déjà fermée": "Alert already closed",
+  "Machine archivée": "Machine archived",
 };
 
 // Messages qui contiennent une partie variable (un nom…).

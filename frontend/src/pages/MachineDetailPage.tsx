@@ -3,11 +3,14 @@
 import { useCallback, useState } from "react";
 import {
   ApiError, machinesApi, parseApiDate, SENSORS,
-  type FailureMode, type Machine, type Measure, type Prediction, type Sensor,
+  type FailureMode, type Machine, type MachineWithKey, type Measure, type Prediction, type Sensor,
 } from "../api";
+import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { hrefFor } from "../router";
-import { Badge, EmptyState, ErrorBox, Notice, Spinner } from "../components/ui";
+import { Badge, Card, EmptyState, ErrorBox, Notice, Spinner } from "../components/ui";
+import ConfirmAction from "../components/ConfirmAction";
+import NewKeyDialog from "../components/NewKeyDialog";
 import RiskChart from "../components/RiskChart";
 import { usePolling } from "../hooks";
 
@@ -16,7 +19,9 @@ const REFRESH_MS = 10_000;
 type Scored = Measure & { prediction: Prediction };
 
 export default function MachineDetailPage({ id }: { id: string }) {
-  const { t } = useI18n();
+  const { t, formatDate } = useI18n();
+  const { me } = useAuth();
+  const canManage = me?.role === "owner" || me?.role === "admin";
   const [machine, setMachine] = useState<Machine | null | undefined>(undefined); // null = introuvable
   const [measures, setMeasures] = useState<Measure[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -62,6 +67,12 @@ export default function MachineDetailPage({ id }: { id: string }) {
         <code className="text-xs text-ink-muted">{t("detail.keyPrefix", { prefix: machine.api_key_prefix })}</code>
       </div>
 
+      {machine.status === "ARCHIVED" ? <Notice tone="warning">{t("manage.archivedNotice")}</Notice>
+        : machine.api_key_revoked_at && (
+          <Notice tone="danger">
+            {t("manage.revokedNotice", { date: formatDate(parseApiDate(machine.api_key_revoked_at)) })}
+          </Notice>
+        )}
       {loadError != null && <ErrorBox error={loadError} onRetry={() => void load()} />}
       {pending > 0 && <Notice>{t("detail.pending", { n: String(pending) })}</Notice>}
 
@@ -87,7 +98,40 @@ export default function MachineDetailPage({ id }: { id: string }) {
           </div>
         </>
       )}
+
+      {canManage && machine.status === "ACTIVE" && <ManagePanel machine={machine} onChanged={load} />}
     </div>
+  );
+}
+
+/** Remplacer / révoquer la clé, archiver la machine (propriétaire et administrateurs). */
+function ManagePanel({ machine, onChanged }: { machine: Machine; onChanged: () => Promise<void> }) {
+  const { t } = useI18n();
+  const [newKey, setNewKey] = useState<MachineWithKey | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  return (
+    <Card className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold">{t("manage.title")}</h2>
+        <p className="text-sm text-ink-muted">{t("manage.intro")}</p>
+      </div>
+      {done && <Notice tone="success">{done}</Notice>}
+      <div className="grid gap-3 md:grid-cols-3">
+        <ConfirmAction label={t("manage.rotate")} help={t("manage.rotateHelp")} confirmLabel={t("manage.rotateConfirm")}
+          onConfirm={async () => { setNewKey(await machinesApi.rotateKey(machine.id)); setDone(null); await onChanged(); }} />
+        <ConfirmAction label={t("manage.revoke")} help={t("manage.revokeHelp")} confirmLabel={t("manage.revokeConfirm")}
+          danger disabled={machine.api_key_revoked_at != null}
+          onConfirm={async () => { await machinesApi.revokeKey(machine.id); setDone(t("manage.revokeDone")); await onChanged(); }} />
+        <ConfirmAction label={t("manage.archive")} help={t("manage.archiveHelp")} confirmLabel={t("manage.archiveConfirm")}
+          danger
+          onConfirm={async () => { await machinesApi.archive(machine.id); setDone(t("manage.archiveDone")); await onChanged(); }} />
+      </div>
+      {newKey && (
+        <NewKeyDialog key={newKey.api_key_created_at ?? newKey.id} machine={newKey} title={t("newKey.rotatedTitle", { name: newKey.name })}
+          onClose={() => setNewKey(null)} />
+      )}
+    </Card>
   );
 }
 

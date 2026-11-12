@@ -192,6 +192,13 @@ export const machinesApi = {
   measures: (id: string, limit = 200) =>
     api<Measure[]>(`/machines/${encodeURIComponent(id)}/mesures?limit=${limit}`),
   create: (name: string) => api<MachineWithKey>("/machines", { method: "POST", body: { json: { name } } }),
+  /** Nouvelle clé (montrée une seule fois) ; l'ancienne cesse de fonctionner. */
+  rotateKey: (id: string) =>
+    api<MachineWithKey>(`/machines/${encodeURIComponent(id)}/api-key/rotate`, { method: "POST" }),
+  /** Bloque la clé tout de suite (ex. boîtier volé). */
+  revokeKey: (id: string) => api<Machine>(`/machines/${encodeURIComponent(id)}/api-key/revoke`, { method: "POST" }),
+  /** Archive : plus de mesures acceptées, une place du plan est libérée, l'historique est gardé. */
+  archive: (id: string) => api<void>(`/machines/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 // ---------- Alertes (app/api/v1/alerts.py, schéma AlertResponse) ----------

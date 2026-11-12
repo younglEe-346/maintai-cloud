@@ -5,7 +5,8 @@ import type { MachineWithKey } from "../api";
 import { useI18n } from "../i18n";
 import { Button } from "./ui";
 
-export default function NewKeyDialog({ machine, onClose }: { machine: MachineWithKey; onClose: () => void }) {
+export default function NewKeyDialog({ machine, onClose, title }:
+  { machine: MachineWithKey; onClose: () => void; title?: string }) {
   const { t } = useI18n();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const keyRef = useRef<HTMLInputElement>(null);
@@ -40,7 +41,7 @@ export default function NewKeyDialog({ machine, onClose }: { machine: MachineWit
       className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-slate-950/60"
     >
       <div className="space-y-4 p-6">
-        <h2 id="new-key-title" className="text-lg font-semibold">{t("newKey.title", { name: machine.name })}</h2>
+        <h2 id="new-key-title" className="text-lg font-semibold">{title ?? t("newKey.title", { name: machine.name })}</h2>
 
         <div className="rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning-ink" role="alert">
           {t("newKey.warning")}

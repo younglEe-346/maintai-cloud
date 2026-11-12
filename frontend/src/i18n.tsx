@@ -1,387 +1,12 @@
-// Traductions français / anglais, sans bibliothèque : un dictionnaire par langue.
-// Ajouter un texte = ajouter la même clé dans `fr` et dans `en` (TypeScript vérifie).
-import { createContext, useContext, useState, type ReactNode } from "react";
+// Traductions français / anglais, sans bibliothèque : un dictionnaire par langue,
+// rangés dans src/locales/ (fr.ts = référence, en.ts = même clés, TypeScript vérifie).
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "./api";
+import { fr, type TranslationKey } from "./locales/fr";
+import { en, SERVER_MESSAGES_EN, SERVER_PATTERNS_EN } from "./locales/en";
 
-const fr = {
-  "app.name": "MaintAI Cloud",
-  "app.tagline": "Maintenance prédictive pour vos machines",
-  "lang.switch": "English",
-  "common.loading": "Chargement…",
-  "common.retry": "Réessayer",
-  "common.serverSays": "Message du serveur :",
-
-  "auth.loginTab": "Se connecter",
-  "auth.registerTab": "Créer une usine",
-  "auth.loginTitle": "Connexion",
-  "auth.loginHelp": "Entrez l'e-mail et le mot de passe de votre compte.",
-  "auth.registerTitle": "Inscrire votre usine",
-  "auth.registerHelp": "Vous créez l'espace de votre usine (plan Gratuit) et vous en devenez le propriétaire. Vous pourrez inviter votre équipe ensuite.",
-  "auth.orgName": "Nom de l'usine",
-  "auth.orgNameHint": "2 à 100 caractères, unique sur la plateforme.",
-  "auth.fullName": "Votre nom complet",
-  "auth.email": "E-mail",
-  "auth.password": "Mot de passe",
-  "auth.passwordHint": "8 caractères minimum.",
-  "auth.passwordConfirm": "Confirmer le mot de passe",
-  "auth.submitLogin": "Se connecter",
-  "auth.submitRegister": "Créer mon usine",
-  "auth.submitting": "Envoi…",
-  "auth.noAccount": "Pas encore de compte ?",
-  "auth.haveAccount": "Déjà un compte ?",
-  "auth.invited": "Invité par votre équipe ? Utilisez le lien reçu par e-mail.",
-  "auth.logout": "Se déconnecter",
-  "auth.sessionExpired": "Votre session a expiré : reconnectez-vous.",
-
-  "valid.required": "Ce champ est obligatoire.",
-  "valid.email": "Adresse e-mail invalide.",
-  "valid.orgName": "Le nom doit faire entre 2 et 100 caractères.",
-  "valid.password": "Le mot de passe doit faire au moins 8 caractères.",
-  "valid.passwordMatch": "Les deux mots de passe ne sont pas identiques.",
-
-  "home.superadminTitle": "Compte super-administrateur",
-  "home.superadminText": "Ce compte n'appartient à aucune usine. Pour suivre les usines et les workers, utilisez pour l'instant le tableau de bord Streamlit (http://localhost:8501).",
-  "role.owner": "propriétaire",
-  "role.admin": "administrateur",
-  "role.member": "membre",
-  "plan.FREE": "Gratuit",
-  "plan.PRO": "Pro",
-
-  "nav.machines": "Machines",
-  "header.org": "{org} · {role}",
-
-  "machines.title": "Machines",
-  "machines.intro": "Chaque machine de l'usine envoie ses mesures à MaintAI avec sa propre clé d'API.",
-  "machines.usage": "{count} / {max} machines actives (plan {plan})",
-  "machines.limitReached": "Limite de votre plan atteinte : archivez une machine ou passez au plan Pro pour en ajouter.",
-  "machines.addTitle": "Ajouter une machine",
-  "machines.name": "Nom de la machine",
-  "machines.nameHint": "Par exemple « Tour CN 1 » ou « Fraiseuse atelier B ».",
-  "machines.nameTooLong": "100 caractères maximum.",
-  "machines.add": "Ajouter",
-  "machines.adding": "Ajout…",
-  "machines.memberOnly": "Seuls le propriétaire et les administrateurs peuvent ajouter des machines.",
-  "machines.emptyTitle": "Aucune machine pour l'instant",
-  "machines.emptyText": "Ajoutez votre première machine avec le formulaire ci-dessus. Vous recevrez une clé d'API : c'est elle que le capteur (ou le simulateur) utilise pour envoyer les mesures.",
-  "machines.emptyMember": "Un propriétaire ou un administrateur de l'usine doit d'abord en ajouter une.",
-  "machines.listTitle": "Machines de l'usine",
-  "machines.colName": "Nom",
-  "machines.colStatus": "État",
-  "machines.colKey": "Clé d'API",
-  "machines.colCreated": "Ajoutée le",
-  "machines.keyHelp": "Seul le début de chaque clé est affiché : la clé complète n'est jamais conservée.",
-  "status.ACTIVE": "Active",
-  "status.ARCHIVED": "Archivée",
-  "key.active": "en service",
-  "key.revoked": "révoquée",
-
-  "newKey.title": "Machine « {name} » ajoutée",
-  "newKey.label": "Clé d'API",
-  "newKey.warning": "Copiez cette clé maintenant : elle ne sera plus jamais affichée. Si vous la perdez, il faudra en créer une nouvelle.",
-  "newKey.copy": "Copier",
-  "newKey.copied": "Copiée !",
-  "newKey.copyFailed": "Copie impossible : sélectionnez la clé puis Ctrl+C.",
-  "newKey.howTo": "La machine l'envoie dans l'en-tête x-api-key de chaque lot de mesures (POST /api/v1/mesures).",
-  "newKey.confirm": "J'ai copié la clé et je l'ai rangée en lieu sûr.",
-  "newKey.close": "Fermer",
-
-  "nav.alerts": "Alertes",
-  "common.refresh": "Actualiser",
-  "common.updatedAt": "Mis à jour à {time}",
-  "common.cancel": "Annuler",
-
-  "alerts.title": "Alertes",
-  "alerts.intro": "Une alerte s'ouvre toute seule quand le risque de panne d'une machine dépasse le seuil, et se ferme toute seule quand il redescend. Acquitter, c'est dire à l'équipe : « je l'ai vue, je m'en occupe ».",
-  "alerts.activeTitle": "Alertes actives",
-  "alerts.historyTitle": "Historique (alertes fermées)",
-  "alerts.emptyActiveTitle": "Aucune alerte active",
-  "alerts.emptyActiveText": "Toutes les machines sont sous le seuil de risque. Cette page se met à jour toute seule toutes les 10 secondes.",
-  "alerts.emptyHistory": "Aucune alerte fermée pour l'instant.",
-  "alerts.status.OPEN": "Ouverte",
-  "alerts.status.ACKNOWLEDGED": "Acquittée",
-  "alerts.status.CLOSED": "Fermée",
-  "alerts.unknownMachine": "Machine inconnue",
-  "alerts.openedAt": "Ouverte le {date}",
-  "alerts.closedAt": "Fermée le {date}",
-  "alerts.riskOpen": "Risque à l'ouverture",
-  "alerts.riskPeak": "Risque maximal",
-  "alerts.riskLast": "Dernier risque",
-  "alerts.mode": "Mode de panne probable",
-  "alerts.details": "Explication du modèle :",
-  "alerts.ackBy": "Prise en charge par {name} le {date}",
-  "alerts.ackComment": "Commentaire : {comment}",
-  "alerts.ackButton": "Acquitter",
-  "alerts.ackFormTitle": "Acquitter cette alerte",
-  "alerts.ackAs": "Au nom de",
-  "alerts.ackAsHint": "Le nom vient de votre compte : personne ne peut acquitter au nom d'un autre.",
-  "alerts.comment": "Commentaire (facultatif)",
-  "alerts.commentHint": "Ce que vous avez constaté ou fait, par exemple « outil changé ». 2000 caractères maximum.",
-  "alerts.commentTooLong": "2000 caractères maximum.",
-  "alerts.ackConfirm": "Confirmer l'acquittement",
-  "alerts.acking": "Envoi…",
-  "alerts.ackStaysActive": "Une alerte acquittée reste active tant que le risque est élevé : elle se fermera toute seule.",
-  "alerts.colMachine": "Machine",
-  "alerts.colOpened": "Ouverte le",
-  "alerts.colClosed": "Fermée le",
-  "alerts.colPeak": "Risque max.",
-  "alerts.colMode": "Mode",
-  "alerts.colAck": "Prise en charge",
-  "mode.TWF": "usure de l'outil (TWF)",
-  "mode.HDF": "mauvaise dissipation de la chaleur (HDF)",
-  "mode.PWF": "puissance hors limites (PWF)",
-  "mode.OSF": "surcharge mécanique (OSF)",
-  "mode.RNF": "panne aléatoire (RNF)",
-  "mode.none": "non déterminé",
-
-  "machines.openHint": "Cliquez sur le nom d'une machine pour voir son risque.",
-  "detail.back": "← Toutes les machines",
-  "detail.notFound": "Machine introuvable : elle n'existe pas ou appartient à une autre usine.",
-  "detail.keyPrefix": "Clé : {prefix}…",
-  "detail.chartTitle": "Risque de panne des {n} dernières mesures",
-  "detail.chartHelp": "Chaque point est une mesure, de la plus ancienne (à gauche) à la plus récente (à droite). Au-dessus de la ligne pointillée (le seuil), le modèle alerte. Cliquez sur un point pour voir son détail.",
-  "detail.threshold": "seuil {value}",
-  "detail.chartAria": "Graphique du risque : {n} mesures, dernier risque {last}, seuil {threshold}.",
-  "detail.older": "plus ancienne",
-  "detail.newer": "plus récente",
-  "detail.prev": "← Précédente",
-  "detail.next": "Suivante →",
-  "detail.latest": "Dernière",
-  "detail.selected": "Mesure du {date} ({pos} sur {n})",
-  "detail.risk": "Risque de panne",
-  "detail.above": "Au-dessus du seuil ({threshold}) : le modèle alerte.",
-  "detail.below": "Sous le seuil ({threshold}) : fonctionnement normal.",
-  "detail.model": "Modèle : {version}",
-  "detail.modeTitle": "Mode de panne probable",
-  "detail.modeNone": "Aucun : le risque est sous le seuil, il n'y a pas de panne à expliquer.",
-  "detail.modeHelp": "Probabilité de chaque type de panne pour cette mesure. Un mode en gras dépasse son propre seuil.",
-  "detail.modesUnavailable": "Ce modèle ne calcule pas les modes de panne.",
-  "detail.contribTitle": "Ce qui fait monter ou baisser le risque",
-  "detail.contribHelp": "Une machine normale a un risque de {base}. Chaque mesure ajoute (rouge) ou retire (vert) des points ; le total donne le risque de cette mesure : {risk}.",
-  "detail.contribUnavailable": "Ce modèle ne calcule pas les contributions.",
-  "detail.colSensor": "Mesure",
-  "detail.colValue": "Valeur",
-  "detail.colNormal": "Normal",
-  "detail.colEffect": "Effet sur le risque",
-  "detail.points": "{value} pts",
-  "detail.pending": "Mesures en cours de calcul par le worker : {n}.",
-  "detail.emptyTitle": "Aucune mesure pour l'instant",
-  "detail.emptyText": "Cette machine n'a encore rien envoyé. Elle doit envoyer ses mesures avec sa clé d'API (POST /api/v1/mesures), par exemple avec le simulateur. Cette page se met à jour toute seule.",
-  "sensor.air_temp": "Température de l'air",
-  "sensor.process_temp": "Température du process",
-  "sensor.rotational_speed": "Vitesse de rotation",
-  "sensor.torque": "Couple",
-  "sensor.tool_wear": "Usure de l'outil",
-  "unit.rotational_speed": "tr/min",
-
-  "error.network": "Impossible de joindre l'API. Vérifiez qu'elle est lancée (docker compose up -d) et qu'elle autorise cette adresse (ALLOWED_ORIGINS).",
-  "error.unauthorized": "Vous n'êtes pas connecté ou votre session a expiré.",
-  "error.forbidden": "Votre rôle ne permet pas cette action.",
-  "error.notFound": "Élément introuvable.",
-  "error.conflict": "Cette action est en conflit avec l'état actuel.",
-  "error.validation": "Certains champs ne sont pas valides.",
-  "error.quota": "La limite de votre plan est atteinte.",
-  "error.server": "Erreur du serveur. Réessayez dans un instant.",
-  "error.other": "La requête a échoué.",
-};
-
-type Key = keyof typeof fr;
-
-const en: Record<Key, string> = {
-  "app.name": "MaintAI Cloud",
-  "app.tagline": "Predictive maintenance for your machines",
-  "lang.switch": "Français",
-  "common.loading": "Loading…",
-  "common.retry": "Try again",
-  "common.serverSays": "Server message:",
-
-  "auth.loginTab": "Sign in",
-  "auth.registerTab": "Create a factory",
-  "auth.loginTitle": "Sign in",
-  "auth.loginHelp": "Enter your account e-mail and password.",
-  "auth.registerTitle": "Register your factory",
-  "auth.registerHelp": "You create your factory's space (Free plan) and become its owner. You can invite your team afterwards.",
-  "auth.orgName": "Factory name",
-  "auth.orgNameHint": "2 to 100 characters, unique on the platform.",
-  "auth.fullName": "Your full name",
-  "auth.email": "E-mail",
-  "auth.password": "Password",
-  "auth.passwordHint": "At least 8 characters.",
-  "auth.passwordConfirm": "Confirm password",
-  "auth.submitLogin": "Sign in",
-  "auth.submitRegister": "Create my factory",
-  "auth.submitting": "Sending…",
-  "auth.noAccount": "No account yet?",
-  "auth.haveAccount": "Already have an account?",
-  "auth.invited": "Invited by your team? Use the link you received by e-mail.",
-  "auth.logout": "Sign out",
-  "auth.sessionExpired": "Your session has expired: please sign in again.",
-
-  "valid.required": "This field is required.",
-  "valid.email": "Invalid e-mail address.",
-  "valid.orgName": "The name must be 2 to 100 characters long.",
-  "valid.password": "The password must be at least 8 characters long.",
-  "valid.passwordMatch": "The two passwords do not match.",
-
-  "home.superadminTitle": "Super-administrator account",
-  "home.superadminText": "This account does not belong to any factory. To monitor factories and workers, use the Streamlit dashboard for now (http://localhost:8501).",
-  "role.owner": "owner",
-  "role.admin": "administrator",
-  "role.member": "member",
-  "plan.FREE": "Free",
-  "plan.PRO": "Pro",
-
-  "nav.machines": "Machines",
-  "header.org": "{org} · {role}",
-
-  "machines.title": "Machines",
-  "machines.intro": "Each machine in the factory sends its measurements to MaintAI with its own API key.",
-  "machines.usage": "{count} / {max} active machines ({plan} plan)",
-  "machines.limitReached": "Your plan's limit is reached: archive a machine or upgrade to the Pro plan to add more.",
-  "machines.addTitle": "Add a machine",
-  "machines.name": "Machine name",
-  "machines.nameHint": "For example \"CNC lathe 1\" or \"Milling machine, shop B\".",
-  "machines.nameTooLong": "100 characters maximum.",
-  "machines.add": "Add",
-  "machines.adding": "Adding…",
-  "machines.memberOnly": "Only the owner and administrators can add machines.",
-  "machines.emptyTitle": "No machines yet",
-  "machines.emptyText": "Add your first machine with the form above. You will get an API key: the sensor (or the simulator) uses it to send measurements.",
-  "machines.emptyMember": "An owner or administrator of the factory must add one first.",
-  "machines.listTitle": "Factory machines",
-  "machines.colName": "Name",
-  "machines.colStatus": "Status",
-  "machines.colKey": "API key",
-  "machines.colCreated": "Added on",
-  "machines.keyHelp": "Only the start of each key is shown: the full key is never stored.",
-  "status.ACTIVE": "Active",
-  "status.ARCHIVED": "Archived",
-  "key.active": "in use",
-  "key.revoked": "revoked",
-
-  "newKey.title": "Machine \"{name}\" added",
-  "newKey.label": "API key",
-  "newKey.warning": "Copy this key now: it will never be shown again. If you lose it, you will have to create a new one.",
-  "newKey.copy": "Copy",
-  "newKey.copied": "Copied!",
-  "newKey.copyFailed": "Copy failed: select the key and press Ctrl+C.",
-  "newKey.howTo": "The machine sends it in the x-api-key header of each batch of measurements (POST /api/v1/mesures).",
-  "newKey.confirm": "I have copied the key and stored it somewhere safe.",
-  "newKey.close": "Close",
-
-  "nav.alerts": "Alerts",
-  "common.refresh": "Refresh",
-  "common.updatedAt": "Updated at {time}",
-  "common.cancel": "Cancel",
-
-  "alerts.title": "Alerts",
-  "alerts.intro": "An alert opens by itself when a machine's failure risk goes above the threshold, and closes by itself when it goes back down. Acknowledging tells the team: \"I have seen it, I am on it\".",
-  "alerts.activeTitle": "Active alerts",
-  "alerts.historyTitle": "History (closed alerts)",
-  "alerts.emptyActiveTitle": "No active alerts",
-  "alerts.emptyActiveText": "All machines are below the risk threshold. This page refreshes by itself every 10 seconds.",
-  "alerts.emptyHistory": "No closed alerts yet.",
-  "alerts.status.OPEN": "Open",
-  "alerts.status.ACKNOWLEDGED": "Acknowledged",
-  "alerts.status.CLOSED": "Closed",
-  "alerts.unknownMachine": "Unknown machine",
-  "alerts.openedAt": "Opened on {date}",
-  "alerts.closedAt": "Closed on {date}",
-  "alerts.riskOpen": "Risk when opened",
-  "alerts.riskPeak": "Peak risk",
-  "alerts.riskLast": "Latest risk",
-  "alerts.mode": "Probable failure mode",
-  "alerts.details": "Model explanation:",
-  "alerts.ackBy": "Handled by {name} on {date}",
-  "alerts.ackComment": "Comment: {comment}",
-  "alerts.ackButton": "Acknowledge",
-  "alerts.ackFormTitle": "Acknowledge this alert",
-  "alerts.ackAs": "On behalf of",
-  "alerts.ackAsHint": "The name comes from your account: nobody can acknowledge on someone else's behalf.",
-  "alerts.comment": "Comment (optional)",
-  "alerts.commentHint": "What you noticed or did, for example \"tool replaced\". 2000 characters maximum.",
-  "alerts.commentTooLong": "2000 characters maximum.",
-  "alerts.ackConfirm": "Confirm acknowledgement",
-  "alerts.acking": "Sending…",
-  "alerts.ackStaysActive": "An acknowledged alert stays active while the risk is high: it will close by itself.",
-  "alerts.colMachine": "Machine",
-  "alerts.colOpened": "Opened on",
-  "alerts.colClosed": "Closed on",
-  "alerts.colPeak": "Peak risk",
-  "alerts.colMode": "Mode",
-  "alerts.colAck": "Handled by",
-  "mode.TWF": "tool wear (TWF)",
-  "mode.HDF": "poor heat dissipation (HDF)",
-  "mode.PWF": "power out of range (PWF)",
-  "mode.OSF": "mechanical overstrain (OSF)",
-  "mode.RNF": "random failure (RNF)",
-  "mode.none": "not determined",
-
-  "machines.openHint": "Click a machine's name to see its risk.",
-  "detail.back": "← All machines",
-  "detail.notFound": "Machine not found: it does not exist or belongs to another factory.",
-  "detail.keyPrefix": "Key: {prefix}…",
-  "detail.chartTitle": "Failure risk of the last {n} measurements",
-  "detail.chartHelp": "Each dot is a measurement, from the oldest (left) to the most recent (right). Above the dashed line (the threshold), the model raises an alert. Click a dot to see its details.",
-  "detail.threshold": "threshold {value}",
-  "detail.chartAria": "Risk chart: {n} measurements, latest risk {last}, threshold {threshold}.",
-  "detail.older": "oldest",
-  "detail.newer": "most recent",
-  "detail.prev": "← Previous",
-  "detail.next": "Next →",
-  "detail.latest": "Latest",
-  "detail.selected": "Measurement of {date} ({pos} of {n})",
-  "detail.risk": "Failure risk",
-  "detail.above": "Above the threshold ({threshold}): the model raises an alert.",
-  "detail.below": "Below the threshold ({threshold}): normal operation.",
-  "detail.model": "Model: {version}",
-  "detail.modeTitle": "Probable failure mode",
-  "detail.modeNone": "None: the risk is below the threshold, there is no failure to explain.",
-  "detail.modeHelp": "Probability of each failure type for this measurement. A mode in bold is above its own threshold.",
-  "detail.modesUnavailable": "This model does not compute failure modes.",
-  "detail.contribTitle": "What raises or lowers the risk",
-  "detail.contribHelp": "A normal machine has a risk of {base}. Each measurement adds (red) or removes (green) points; the total gives this measurement's risk: {risk}.",
-  "detail.contribUnavailable": "This model does not compute contributions.",
-  "detail.colSensor": "Measurement",
-  "detail.colValue": "Value",
-  "detail.colNormal": "Normal",
-  "detail.colEffect": "Effect on risk",
-  "detail.points": "{value} pts",
-  "detail.pending": "Measurements still being processed by the worker: {n}.",
-  "detail.emptyTitle": "No measurements yet",
-  "detail.emptyText": "This machine has not sent anything yet. It must send its measurements with its API key (POST /api/v1/mesures), for example with the simulator. This page refreshes by itself.",
-  "sensor.air_temp": "Air temperature",
-  "sensor.process_temp": "Process temperature",
-  "sensor.rotational_speed": "Rotational speed",
-  "sensor.torque": "Torque",
-  "sensor.tool_wear": "Tool wear",
-  "unit.rotational_speed": "rpm",
-
-  "error.network": "Cannot reach the API. Check that it is running (docker compose up -d) and that it allows this address (ALLOWED_ORIGINS).",
-  "error.unauthorized": "You are not signed in or your session has expired.",
-  "error.forbidden": "Your role does not allow this action.",
-  "error.notFound": "Item not found.",
-  "error.conflict": "This action conflicts with the current state.",
-  "error.validation": "Some fields are not valid.",
-  "error.quota": "Your plan's limit has been reached.",
-  "error.server": "Server error. Please try again in a moment.",
-  "error.other": "The request failed.",
-};
-
-// Messages connus de l'API (écrits en français) traduits en anglais.
-const SERVER_MESSAGES_EN: Record<string, string> = {
-  "E-mail ou mot de passe incorrect": "Incorrect e-mail or password",
-  "Cet e-mail est déjà utilisé": "This e-mail is already in use",
-  "Ce nom d'usine est déjà utilisé": "This factory name is already in use",
-  "Identifiants invalides ou session expirée": "Invalid credentials or expired session",
-  "Machine introuvable": "Machine not found",
-  "Alerte introuvable": "Alert not found",
-  "Alerte déjà fermée": "Alert already closed",
-};
-
-// Messages qui contiennent une partie variable (un nom…).
-const SERVER_PATTERNS_EN: [RegExp, string][] = [
-  [/^Alerte déjà acquittée par (.*)$/, "Alert already acknowledged by $1"],
-];
+export type { TranslationKey };
+type Key = TranslationKey;
 
 function translateServerMessage(message: string): string {
   if (SERVER_MESSAGES_EN[message]) return SERVER_MESSAGES_EN[message];
@@ -424,36 +49,38 @@ const I18nContext = createContext<I18n | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(initialLang);
-  document.documentElement.lang = lang;
 
-  const setLang = (next: Lang) => {
-    setLangState(next);
-    try { localStorage.setItem(LANG_KEY, next); } catch { /* rien */ }
-  };
+  // Langue de la page (lecteurs d'écran, césure) : effet de bord, donc dans un useEffect.
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
-  const t: I18n["t"] = (key, vars) =>
-    DICTS[lang][key].replace(/\{(\w+)\}/g, (_, name: string) => vars?.[name] ?? "");
+  // Toutes les fonctions ne changent que si la langue change : les écrans ne se redessinent pas pour rien.
+  const value = useMemo<I18n>(() => {
+    const locale = lang === "fr" ? "fr-FR" : "en-GB";
+    const t: I18n["t"] = (key, vars) =>
+      DICTS[lang][key].replace(/\{(\w+)\}/g, (_, name: string) => vars?.[name] ?? "");
+    return {
+      lang,
+      t,
+      setLang: (next) => {
+        setLangState(next);
+        try { localStorage.setItem(LANG_KEY, next); } catch { /* rien */ }
+      },
+      formatDate: (date) => date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }),
+      formatTime: (date) => date.toLocaleTimeString(locale),
+      formatPercent: (value) =>
+        value.toLocaleString(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      formatNumber: (value, maxDigits = 1) => value.toLocaleString(locale, { maximumFractionDigits: maxDigits }),
+      errorText: (error) => {
+        if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
+        const detail = lang === "en" ? translateServerMessage(error.detail) : error.detail;
+        // Refus simple (400) avec une explication du serveur : l'explication suffit comme titre.
+        if (error.kind === "other" && detail) return { title: detail, detail: "" };
+        return { title: t(`error.${error.kind}`), detail };
+      },
+    };
+  }, [lang]);
 
-  const formatDate: I18n["formatDate"] = (date) =>
-    date.toLocaleString(lang === "fr" ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
-
-  const locale = lang === "fr" ? "fr-FR" : "en-GB";
-  const formatTime: I18n["formatTime"] = (date) => date.toLocaleTimeString(locale);
-  const formatPercent: I18n["formatPercent"] = (value) =>
-    value.toLocaleString(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-  const formatNumber: I18n["formatNumber"] = (value, maxDigits = 1) =>
-    value.toLocaleString(locale, { maximumFractionDigits: maxDigits });
-
-  const errorText: I18n["errorText"] = (error) => {
-    if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
-    const detail = lang === "en" ? translateServerMessage(error.detail) : error.detail;
-    // Refus simple (400) avec une explication du serveur : l'explication suffit comme titre.
-    if (error.kind === "other" && detail) return { title: detail, detail: "" };
-    return { title: t(`error.${error.kind}` as Key), detail };
-  };
-
-  return <I18nContext.Provider value={{ lang, setLang, t, formatDate, formatTime, formatPercent, formatNumber, errorText }}>{children}</I18nContext.Provider>;
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18n {
@@ -461,5 +88,3 @@ export function useI18n(): I18n {
   if (!ctx) throw new Error("useI18n doit être utilisé dans <I18nProvider>");
   return ctx;
 }
-
-export type TranslationKey = Key;

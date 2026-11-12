@@ -102,8 +102,9 @@ function RegisterForm() {
   const [apiError, setApiError] = useState<unknown>(null);
   const [sending, setSending] = useState(false);
 
+  // Mise à jour « fonctionnelle » : on part toujours de la dernière valeur du formulaire.
   const set = (name: keyof typeof form) => (e: { target: { value: string } }) =>
-    setForm({ ...form, [name]: e.target.value });
+    setForm((prev) => ({ ...prev, [name]: e.target.value }));
 
   function validate(): Errors {
     const found: Errors = {};

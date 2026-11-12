@@ -2,7 +2,7 @@
 import { useAuth } from "./auth";
 import { useI18n, type TranslationKey } from "./i18n";
 import { hrefFor, menuPage, useRoute, type Route } from "./router";
-import { Button, Notice, Spinner } from "./components/ui";
+import { Button, ErrorBox, Notice, Spinner } from "./components/ui";
 import AuthPage from "./pages/AuthPage";
 import AlertsPage from "./pages/AlertsPage";
 import MachineDetailPage from "./pages/MachineDetailPage";
@@ -33,12 +33,22 @@ function Page({ route }: { route: Route }) {
 }
 
 export default function App() {
-  const { status, me, logout } = useAuth();
+  const { status, me, error, retry, logout } = useAuth();
   const { t } = useI18n();
   const route = useRoute();
 
   if (status === "loading") {
     return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>;
+  }
+
+  if (status === "unreachable") {
+    return (
+      <div className="mx-auto max-w-md space-y-4 px-4 py-10">
+        <Notice tone="warning">{t("auth.unreachable")}</Notice>
+        <ErrorBox error={error} onRetry={retry} />
+        <Button variant="secondary" onClick={logout}>{t("auth.logout")}</Button>
+      </div>
+    );
   }
 
   if (status === "signedOut" || !me) {

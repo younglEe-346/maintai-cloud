@@ -1,10 +1,11 @@
 // Écran 3 : alertes actives (avec acquittement) et historique des alertes fermées.
 // La page se recharge toute seule toutes les 10 secondes : une nouvelle alerte apparaît sans rien faire.
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { ApiError, alertsApi, machinesApi, parseApiDate, type Alert } from "../api";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
 import { Button, ErrorBox, Notice, Spinner } from "../components/ui";
+import { usePolling, useTimeout } from "../hooks";
 
 const REFRESH_MS = 10_000;
 
@@ -28,11 +29,7 @@ export default function AlertsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(), REFRESH_MS);
-    return () => window.clearInterval(timer);   // on arrête quand on quitte la page
-  }, [load]);
+  usePolling(load, REFRESH_MS);   // s'arrête tout seul quand on quitte la page
 
   const machineName = (id: string) => data?.machineNames.get(id) ?? t("alerts.unknownMachine");
 
@@ -152,6 +149,7 @@ function AckForm({ alertId, onCancel, onDone }: { alertId: string; onCancel: () 
   const [comment, setComment] = useState("");
   const [apiError, setApiError] = useState<unknown>(null);
   const [sending, setSending] = useState(false);
+  const later = useTimeout();
   const tooLong = comment.trim().length > 2000;   // même limite que l'API (AcknowledgeIn)
 
   async function submit(e: FormEvent) {
@@ -165,7 +163,7 @@ function AckForm({ alertId, onCancel, onDone }: { alertId: string; onCancel: () 
     } catch (err) {
       setApiError(err);
       // 409 : quelqu'un d'autre l'a acquittée (ou elle s'est fermée) entre-temps : on recharge la liste.
-      if (err instanceof ApiError && err.kind === "conflict") window.setTimeout(onDone, 3000);
+      if (err instanceof ApiError && err.kind === "conflict") later(onDone, 3000);
     } finally {
       setSending(false);
     }

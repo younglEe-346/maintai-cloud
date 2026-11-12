@@ -1,14 +1,15 @@
 // Écran 4 : détail d'une machine. Graphique du risque, puis, pour la mesure choisie
 // (la plus récente par défaut) : risque, mode de panne probable et contributions de chaque mesure.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  machinesApi, parseApiDate, SENSORS,
+  ApiError, machinesApi, parseApiDate, SENSORS,
   type FailureMode, type Machine, type Measure, type Prediction, type Sensor,
 } from "../api";
 import { useI18n } from "../i18n";
 import { hrefFor } from "../router";
 import { ErrorBox, Notice, Spinner } from "../components/ui";
 import RiskChart from "../components/RiskChart";
+import { usePolling } from "../hooks";
 
 const REFRESH_MS = 10_000;
 
@@ -26,21 +27,18 @@ export default function MachineDetailPage({ id }: { id: string }) {
   const load = useCallback(async () => {
     try {
       // Pas de route « une machine » dans l'API : on prend la liste et on cherche la bonne.
-      const list = await machinesApi.list();
-      const found = list.find((m) => m.id === id) ?? null;
-      setMachine(found);
-      if (found) setMeasures(await machinesApi.measures(id, 200));
+      // Les deux appels partent en même temps ; une machine inconnue fait répondre 404 aux mesures.
+      const [list, rows] = await Promise.all([machinesApi.list(), machinesApi.measures(id, 200)]);
+      setMachine(list.find((m) => m.id === id) ?? null);
+      setMeasures(rows);
       setLoadError(null);
     } catch (err) {
-      setLoadError(err);
+      if (err instanceof ApiError && err.kind === "notFound") setMachine(null);
+      else setLoadError(err);
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => void load(), REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  usePolling(load, REFRESH_MS);
 
   const back = <a href={hrefFor({ page: "machines" })} className="text-sm text-blue-700 hover:underline">{t("detail.back")}</a>;
 

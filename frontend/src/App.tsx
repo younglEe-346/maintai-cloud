@@ -8,11 +8,13 @@ import AuthPage from "./pages/AuthPage";
 import AlertsPage from "./pages/AlertsPage";
 import MachineDetailPage from "./pages/MachineDetailPage";
 import MachinesPage from "./pages/MachinesPage";
+import SettingsPage from "./pages/SettingsPage";
 
 // Menu : un écran sera ajouté ici à chaque étape.
 const MENU: { route: Route; label: TranslationKey }[] = [
   { route: { page: "machines" }, label: "nav.machines" },
   { route: { page: "alerts" }, label: "nav.alerts" },
+  { route: { page: "settings" }, label: "nav.settings" },
 ];
 
 function LangSwitch() {
@@ -35,6 +37,7 @@ function Page({ route }: { route: Route }) {
     case "machines": return <MachinesPage />;
     case "machine": return <MachineDetailPage key={route.id} id={route.id} />;
     case "alerts": return <AlertsPage />;
+    case "settings": return <SettingsPage />;
   }
 }
 

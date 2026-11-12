@@ -53,7 +53,8 @@ export function setUnauthorizedHandler(handler: () => void): void { onUnauthoriz
 
 type Body = { json: unknown } | { form: Record<string, string> } | undefined;
 
-export async function api<T>(path: string, options: { method?: string; body?: Body } = {}): Promise<T> {
+/** Envoie la requête ; toute réponse en erreur devient une ApiError (et 401 déconnecte). */
+async function send(path: string, options: { method?: string; body?: Body } = {}): Promise<Response> {
   const headers: Record<string, string> = {};
   const token = tokenStore.get();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -75,14 +76,36 @@ export async function api<T>(path: string, options: { method?: string; body?: Bo
     throw new ApiError(0, "");
   }
 
-  if (response.status === 204) return undefined as T;
-  const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = toApiError(response.status, data);
+    const error = toApiError(response.status, await response.json().catch(() => null));
     if (error.kind === "unauthorized" && token) onUnauthorized();
     throw error;
   }
-  return data as T;
+  return response;
+}
+
+/** Appel JSON classique : renvoie la réponse décodée (rien pour un 204). */
+export async function api<T>(path: string, options: { method?: string; body?: Body } = {}): Promise<T> {
+  const response = await send(path, options);
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+/**
+ * Télécharge un fichier protégé par le jeton (export CSV).
+ * Un simple lien <a href> n'enverrait pas l'en-tête Authorization : on récupère donc
+ * le fichier avec fetch, puis on le « clique » depuis la mémoire du navigateur.
+ */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const blob = await (await send(path)).blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function toApiError(status: number, data: unknown): ApiError {
@@ -138,9 +161,70 @@ export interface Organization {
   measures_today: number;
 }
 
+export interface ThresholdStats {
+  recall: number;            // part des pannes détectées (0 à 1)
+  precision: number;         // part des alertes qui étaient de vraies pannes
+  missed_failures: number;   // pannes manquées sur le jeu de test
+  false_alarms: number;      // fausses alertes sur le jeu de test
+}
+
+/** Réglages de l'usine (GET/PUT /org/settings). */
+export interface OrgSettings {
+  cost_ratio: number;          // une panne manquée coûte N fois une fausse alerte
+  alert_open_k: number;        // mesures hautes d'affilée pour ouvrir une alerte
+  alert_close_k: number;       // mesures basses d'affilée pour la fermer
+  alert_close_factor: number;  // seuil bas = facteur × seuil haut
+  model_version: string;
+  threshold_high: number;
+  threshold_low: number;
+  expected: ThresholdStats & { evaluated_on: number };
+}
+
+export type SettingsInput = Pick<OrgSettings, "cost_ratio" | "alert_open_k" | "alert_close_k" | "alert_close_factor">;
+
+/** Aperçu sans enregistrer (GET /org/settings/preview). */
+export interface ThresholdPreview extends ThresholdStats { cost_ratio: number; threshold: number; }
+
+export type Usage = Omit<Organization, "id" | "name" | "my_role">;
+
 export const orgApi = {
   get: () => api<Organization>("/org"),
+  settings: () => api<OrgSettings>("/org/settings"),
+  updateSettings: (input: SettingsInput) => api<OrgSettings>("/org/settings", { method: "PUT", body: { json: input } }),
+  preview: (costRatio: number) => api<ThresholdPreview>(`/org/settings/preview?cost_ratio=${encodeURIComponent(costRatio)}`),
+  /** Propriétaire seulement ; paiement simulé. */
+  changePlan: (plan: Organization["plan"]) => api<Usage>("/org/plan", { method: "PUT", body: { json: { plan } } }),
 };
+
+// ---------- Modèle d'IA de l'usine (app/api/v1/models_api.py) ----------
+
+export interface ModelJob {
+  id: string;
+  version: number;
+  name: string;
+  status: "training" | "active" | "rejected" | "failed" | "retired";
+  message: string | null;     // explication écrite par le serveur (en français)
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface ModelsOverview { current_model: string; custom_model_allowed: boolean; history: ModelJob[]; }
+
+export const modelsApi = {
+  overview: () => api<ModelsOverview>("/org/models"),
+  retrain: () => api<ModelJob>("/org/models/retrain", { method: "POST" }),
+};
+
+// ---------- Export CSV (app/api/v1/export.py, plan Pro) ----------
+
+export const exportApi = {
+  measures: () => downloadFile("/export/mesures.csv", `maintai_mesures_${today()}.csv`),
+  alerts: () => downloadFile("/export/alertes.csv", `maintai_alertes_${today()}.csv`),
+};
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export type FailureMode = "TWF" | "HDF" | "PWF" | "OSF" | "RNF";
 

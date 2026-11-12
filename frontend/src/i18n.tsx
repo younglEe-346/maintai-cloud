@@ -43,6 +43,8 @@ interface I18n {
   formatNumber: (value: number, maxDigits?: number) => string;
   /** Message lisible pour une erreur (ApiError ou autre). */
   errorText: (error: unknown) => { title: string; detail: string };
+  /** Texte écrit par le serveur (en français), traduit en anglais quand on le connaît. */
+  serverText: (message: string) => string;
 }
 
 const I18nContext = createContext<I18n | null>(null);
@@ -70,6 +72,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       formatPercent: (value) =>
         value.toLocaleString(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }),
       formatNumber: (value, maxDigits = 1) => value.toLocaleString(locale, { maximumFractionDigits: maxDigits }),
+      serverText: (message) => (lang === "en" ? translateServerMessage(message) : message),
       errorText: (error) => {
         if (!(error instanceof ApiError)) return { title: t("error.other"), detail: String(error) };
         const detail = lang === "en" ? translateServerMessage(error.detail) : error.detail;

@@ -11,6 +11,7 @@ import MachineDetailPage from "./pages/MachineDetailPage";
 import MachinesPage from "./pages/MachinesPage";
 import SettingsPage from "./pages/SettingsPage";
 import TeamPage from "./pages/TeamPage";
+import AdminPage from "./pages/AdminPage";
 import AcceptInvitationPage, { clearInvitationFromUrl, readInvitationToken } from "./pages/AcceptInvitationPage";
 
 // Menu principal (les six écrans demandés ; le détail d'une machine s'ouvre depuis « Machines »).
@@ -108,18 +109,18 @@ export default function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            {me.organization && (
-              <span className="hidden text-sm text-ink-muted md:inline">
-                {t("header.org", { org: me.organization.name, role: t(`role.${me.role}`) })}
-              </span>
-            )}
+            <span className="hidden text-sm text-ink-muted md:inline">
+              {me.organization
+                ? t("header.org", { org: me.organization.name, role: t(`role.${me.role}`) })
+                : me.is_superadmin && t("admin.signedInAs")}
+            </span>
             <Preferences />
             <Button variant="secondary" onClick={logout}>{t("auth.logout")}</Button>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {me.organization ? <Page route={route} /> : (
+        {me.organization ? <Page route={route} /> : me.is_superadmin ? <AdminPage /> : (
           <Notice tone="warning">
             <p className="font-medium">{t("home.superadminTitle")}</p>
             <p>{t("home.superadminText")}</p>

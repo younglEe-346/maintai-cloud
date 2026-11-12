@@ -351,6 +351,43 @@ export const alertsApi = {
     api<Alert>(`/alerts/${encodeURIComponent(id)}/acknowledge`, { method: "POST", body: { json: { comment } } }),
 };
 
+// ---------- Super-administrateur (app/api/v1/admin.py) ----------
+
+/** Une usine vue par l'équipe MaintAI : des compteurs, jamais les mesures elles-mêmes. */
+export interface AdminOrganization {
+  id: string;
+  name: string;
+  plan: Organization["plan"];
+  created_at: string;
+  members: number;
+  machines: number;
+  max_machines: number;
+  measures_today: number;
+  max_measures_per_day: number;
+  active_alerts: number;
+  last_measure_at: string | null;
+  model: string;
+}
+
+export interface WorkerInfo {
+  name: string;
+  online: boolean;
+  active_tasks: number;
+  running: string[];
+  processes: number;
+  tasks_done: Record<string, number>;
+}
+
+export interface WorkersStatus { workers: WorkerInfo[]; queued_tasks: number | null; }
+
+export const adminApi = {
+  organizations: () => api<AdminOrganization[]>("/admin/organizations"),
+  setPlan: (orgId: string, plan: Organization["plan"]) =>
+    api<{ id: string; name: string; plan: Organization["plan"] }>(
+      `/admin/organizations/${encodeURIComponent(orgId)}/plan`, { method: "PUT", body: { json: { plan } } }),
+  workers: () => api<WorkersStatus>("/admin/workers"),
+};
+
 /** L'API renvoie des dates UTC sans fuseau ("2026-11-10T23:31:00") : on ajoute le Z. */
 export function parseApiDate(value: string): Date {
   return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`);

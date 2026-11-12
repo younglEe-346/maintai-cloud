@@ -1,4 +1,5 @@
 // Squelette de l'application : en-tête (menu, langue, thème, déconnexion) + écran choisi dans l'adresse (#/...).
+import { useState } from "react";
 import { useAuth } from "./auth";
 import { useI18n, type TranslationKey } from "./i18n";
 import { hrefFor, menuPage, useRoute, type Route } from "./router";
@@ -9,12 +10,15 @@ import AlertsPage from "./pages/AlertsPage";
 import MachineDetailPage from "./pages/MachineDetailPage";
 import MachinesPage from "./pages/MachinesPage";
 import SettingsPage from "./pages/SettingsPage";
+import TeamPage from "./pages/TeamPage";
+import AcceptInvitationPage, { clearInvitationFromUrl, readInvitationToken } from "./pages/AcceptInvitationPage";
 
-// Menu : un écran sera ajouté ici à chaque étape.
+// Menu principal (les six écrans demandés ; le détail d'une machine s'ouvre depuis « Machines »).
 const MENU: { route: Route; label: TranslationKey }[] = [
   { route: { page: "machines" }, label: "nav.machines" },
   { route: { page: "alerts" }, label: "nav.alerts" },
   { route: { page: "settings" }, label: "nav.settings" },
+  { route: { page: "team" }, label: "nav.team" },
 ];
 
 function LangSwitch() {
@@ -38,6 +42,7 @@ function Page({ route }: { route: Route }) {
     case "machine": return <MachineDetailPage key={route.id} id={route.id} />;
     case "alerts": return <AlertsPage />;
     case "settings": return <SettingsPage />;
+    case "team": return <TeamPage />;
   }
 }
 
@@ -45,9 +50,20 @@ export default function App() {
   const { status, me, error, retry, logout } = useAuth();
   const { t } = useI18n();
   const route = useRoute();
+  // Lien reçu par e-mail (?invitation=...) : on montre la page d'acceptation avant tout le reste.
+  const [invitation, setInvitation] = useState(readInvitationToken);
 
   if (status === "loading") {
     return <div className="flex min-h-screen items-center justify-center"><Spinner /></div>;
+  }
+
+  if (invitation) {
+    return (
+      <>
+        <div className="flex justify-end p-4"><Preferences /></div>
+        <AcceptInvitationPage token={invitation} onDone={() => { clearInvitationFromUrl(); setInvitation(null); }} />
+      </>
+    );
   }
 
   if (status === "unreachable") {

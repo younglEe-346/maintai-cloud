@@ -54,7 +54,7 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8501,http://localhost:5173}
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
-      - FRONTEND_URL=http://localhost:8501
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}   # liens d'invitation : front-end React
       - ORG_MODELS_DIR=/app/org_models
     volumes:
       - ./models:/app/models:ro

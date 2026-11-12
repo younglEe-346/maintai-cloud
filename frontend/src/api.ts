@@ -146,6 +146,44 @@ export const authApi = {
     api<Token>("/auth/register", { method: "POST", body: { json: input } }),
   /** GET /auth/me : qui est connecté. */
   me: () => api<Me>("/auth/me"),
+  /** GET /auth/invitations/{jeton} : usine, e-mail et rôle d'une invitation (sans être connecté). */
+  invitationInfo: (token: string) => api<InvitationInfo>(`/auth/invitations/${encodeURIComponent(token)}`),
+  /** POST /auth/accept-invitation : crée le compte du collègue invité et le connecte. */
+  acceptInvitation: (input: { token: string; full_name: string; password: string }) =>
+    api<Token>("/auth/accept-invitation", { method: "POST", body: { json: input } }),
+};
+
+export interface InvitationInfo { organization: string; email: string; role: TeamRole; expires_at: string; }
+
+// ---------- Équipe : membres et invitations (app/api/v1/organization.py) ----------
+
+/** Rôles qu'on peut donner : « owner » (propriétaire) est réservé au créateur de l'usine. */
+export type TeamRole = "admin" | "member";
+
+export interface Member { id: string; email: string; full_name: string | null; role: Me["role"]; created_at: string; }
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: TeamRole;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
+
+export const teamApi = {
+  members: () => api<Member[]>("/org/members"),
+  /** Propriétaire seulement. */
+  changeRole: (userId: string, role: TeamRole) =>
+    api<Member>(`/org/members/${encodeURIComponent(userId)}`, { method: "PATCH", body: { json: { role } } }),
+  /** Désactive le compte du membre ; son historique est gardé. */
+  remove: (userId: string) => api<void>(`/org/members/${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  invitations: () => api<Invitation[]>("/org/invitations"),
+  /** email_sent = faux si le serveur d'e-mails n'a pas répondu (l'invitation existe quand même). */
+  invite: (email: string, role: TeamRole) =>
+    api<Invitation & { email_sent: boolean }>("/org/invitations", { method: "POST", body: { json: { email, role } } }),
+  revoke: (id: string) => api<void>(`/org/invitations/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 // ---------- Usine : plan et consommation (app/api/v1/organization.py) ----------

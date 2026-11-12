@@ -22,7 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))
 SMTP_FROM = os.getenv("SMTP_FROM", "MaintAI Cloud <noreply@maintai.local>")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8501")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")  # front-end React (liens d'invitation)
 INVITATION_DAYS = int(os.getenv("INVITATION_DAYS", "7"))
 
 # Modèles réentraînés par usine (plan Pro) : un sous-dossier par usine

@@ -7,7 +7,8 @@ export type Route =
   | { page: "machines" }
   | { page: "machine"; id: string }
   | { page: "alerts" }
-  | { page: "settings" };
+  | { page: "settings" }
+  | { page: "team" };
 
 const DEFAULT_ROUTE: Route = { page: "machines" };
 
@@ -17,6 +18,7 @@ export function parseHash(hash: string): Route {
     case "machines": return parts[1] ? { page: "machine", id: decodeURIComponent(parts[1]) } : { page: "machines" };
     case "alerts": return { page: "alerts" };
     case "settings": return { page: "settings" };
+    case "team": return { page: "team" };
     default: return DEFAULT_ROUTE;
   }
 }

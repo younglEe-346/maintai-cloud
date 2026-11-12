@@ -369,7 +369,9 @@ ni retiré : une usine a toujours un propriétaire.)
 1. `POST /org/invitations {"email", "role"}` : on crée un **jeton aléatoire** de 256 bits.
    En base on ne stocke que son **empreinte SHA-256** : quelqu'un qui lirait la base ne
    pourrait pas utiliser les invitations.
-2. Un e-mail part avec le lien `http://localhost:8501/?invitation=<jeton>` (valable 7 jours).
+2. Un e-mail part avec le lien `http://localhost:5173/?invitation=<jeton>` (valable 7 jours) :
+   il ouvre le front-end React (variable `FRONTEND_URL` ; le tableau de bord Streamlit sait
+   aussi accepter ce lien si on remet `FRONTEND_URL=http://localhost:8501`).
    En développement, **Mailpit** reçoit l'e-mail : on le lit sur http://localhost:8025.
 3. Le collègue ouvre le lien ; `GET /auth/invitations/{jeton}` affiche l'usine et le rôle.
 4. `POST /auth/accept-invitation {"token", "full_name", "password"}` crée son compte.

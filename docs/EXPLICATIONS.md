@@ -803,7 +803,7 @@ s'ouvre dans le navigateur (http://localhost:5173). Elle utilise **la même API*
 tableau de bord Streamlit : elle n'a aucun accès direct à la base, toutes les règles
 (rôles, plans, isolation des usines) restent appliquées par l'API.
 
-Elle est construite **un écran à la fois** :
+Elle a été construite **un écran à la fois** (un commit par écran) :
 
 | Étape | Écran | État |
 |---|---|---|
@@ -811,8 +811,12 @@ Elle est construite **un écran à la fois** :
 | 2 | Liste des machines, ajout, clé d'API montrée une seule fois | ✅ fait |
 | 3 | Alertes avec acquittement (nom + commentaire) | ✅ fait |
 | 4 | Détail d'une machine : risque, mode de panne, contributions | ✅ fait |
-| 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | à faire |
-| 6 | Équipe : invitations et rôles | à faire |
+| 5 | Réglages : coût d'une panne manquée, seuil, plan et usage | ✅ fait |
+| 6 | Équipe : invitations et rôles | ✅ fait |
+| + | Acceptation d'une invitation (lien reçu par e-mail) | ✅ fait |
+| + | Gestion d'une machine : remplacer / révoquer la clé, archiver | ✅ fait |
+| + | Écran du super-administrateur : usines et workers | ✅ fait |
+| + | Mode sombre (bouton lune / soleil) | ✅ fait |
 
 ### 12 bis.2 Les outils, expliqués simplement
 | Outil | Rôle, en une phrase |
@@ -820,7 +824,7 @@ Elle est construite **un écran à la fois** :
 | **React** | découpe l'écran en *composants* (un formulaire, un bouton…) qui se redessinent tout seuls quand leurs données changent |
 | **TypeScript** | du JavaScript avec des *types* : l'éditeur signale une faute (champ mal nommé, texte non traduit) avant de lancer l'application |
 | **Vite** | lance l'application en développement (rechargement instantané) et fabrique la version finale (`npm run build`) |
-| **Tailwind CSS** | la mise en forme s'écrit directement dans les classes (`bg-blue-600`, `rounded-md`…) au lieu d'un gros fichier CSS |
+| **Tailwind CSS** | la mise en forme s'écrit directement dans les classes (`bg-surface`, `rounded-md`…) au lieu d'un gros fichier CSS |
 
 **Aucune autre dépendance** : pas de bibliothèque de traduction, pas de routeur, pas de
 client HTTP. `fetch` (intégré au navigateur) suffit pour appeler l'API, et un simple
@@ -913,6 +917,105 @@ nom d'une machine dans la liste).
 6. Machine sans mesure : un cadre explique comment en envoyer. Identifiant inconnu (ou
    machine d'une autre usine) : « Machine introuvable ».
 
+**Gérer une machine (complément de l'étape 4).** En bas du détail d'une machine, le
+propriétaire et les administrateurs ont trois actions, qui existaient dans l'API mais
+pas dans l'interface :
+- **Remplacer la clé** (`POST /machines/{id}/api-key/rotate`) : la nouvelle clé s'affiche
+  une seule fois, dans la même fenêtre que lors de l'ajout ; l'ancienne ne marche plus.
+- **Révoquer la clé** (`POST …/api-key/revoke`) : la clé est bloquée tout de suite (boîtier
+  volé) ; un bandeau rouge le rappelle ensuite sur la page.
+- **Archiver la machine** (`DELETE /machines/{id}`) : plus de mesures, une place du plan
+  libérée, historique gardé.
+Chaque action se fait **en deux clics** (`ConfirmAction.tsx`) : le premier explique ce
+qui va se passer, le second confirme. Pas de fenêtre surgissante du navigateur.
+
+**Réglages (étape 5).** Adresse : `#/settings`. Cinq blocs :
+1. **Coût d'une panne manquée.** L'utilisateur tape le ratio « panne manquée ÷ fausse
+   alerte » (la virgule française est acceptée : `0,5`) ou clique une valeur courante
+   (1, 10, 50, 100, 1 000). **400 ms après la dernière frappe**, le front-end demande un
+   aperçu à l'API (`GET /org/settings/preview?cost_ratio=…`), sans rien enregistrer, et
+   affiche un tableau « réglage actuel / avec ce ratio » : seuil d'alerte, pannes
+   détectées, pannes manquées, fausses alertes, alertes justifiées (sur les 10 000
+   mesures de test du modèle). Une réponse arrivée trop tard (l'utilisateur a déjà tapé
+   autre chose) est ignorée.
+2. **Ouverture et fermeture des alertes** : mesures d'affilée pour ouvrir (1 à 50), pour
+   fermer (1 à 50), facteur du seuil bas (entre 0 et 1, exclus), avec le seuil bas
+   calculé en direct. Mêmes contrôles que l'API (`SettingsIn`).
+3. **Enregistrer** (`PUT /org/settings`) : l'API renvoie le nouveau seuil, affiché dans
+   un message vert ; le worker l'applique aux mesures suivantes.
+4. **Plan et consommation** (`GET /org`) : machines actives et mesures du jour, avec une
+   barre (bleue, orange à 80 %, rouge à 100 %), et les fonctions incluses. Le
+   **propriétaire** peut changer de plan (`PUT /org/plan`, paiement simulé). Repasser en
+   Gratuit avec plus de 2 machines actives est refusé (409) : le message du serveur
+   explique quoi faire. Après un changement, le profil est relu (`refreshMe`).
+5. **Export CSV** (Pro, propriétaire et administrateurs) et **modèle d'IA** (modèle
+   utilisé, réentraînement en Pro, derniers résultats relus toutes les 10 s).
+Un membre voit tout en lecture seule (champs grisés, une phrase explique pourquoi).
+
+**Télécharger un fichier protégé.** Un simple lien `<a href=".../export/mesures.csv">`
+n'enverrait pas le jeton. `downloadFile` (dans `api.ts`) récupère donc le fichier avec
+`fetch` (avec l'en-tête `Authorization`), puis le « clique » depuis la mémoire du
+navigateur (`URL.createObjectURL`).
+
+**Équipe (étape 6).** Adresse : `#/team`.
+1. Un rappel « Qui peut faire quoi ? » (propriétaire, administrateur, membre).
+2. **Inviter un collègue** (propriétaire et administrateurs) : e-mail + rôle. Le rôle
+   « administrateur » est grisé pour un administrateur (seul le propriétaire peut en
+   inviter, comme dans l'API). Si le serveur d'e-mails ne répond pas, l'API le dit
+   (`email_sent: false`) et l'écran l'explique.
+3. **Membres** (`GET /org/members`) : nom, e-mail, « (vous) », date d'arrivée. Le
+   **propriétaire** change un rôle avec une liste déroulante (`PATCH /org/members/{id}`,
+   enregistré tout de suite) ; un membre est retiré en deux clics (`DELETE`).
+   Les boutons suivent les règles de l'API : jamais sur le propriétaire ni sur
+   soi-même, et un administrateur ne retire que des membres.
+4. **Invitations envoyées** (`GET /org/invitations`) : état calculé à partir des dates
+   (en attente, acceptée, annulée, expirée) et bouton « Annuler l'invitation ».
+5. Un membre voit seulement la liste de l'équipe.
+
+**Accepter une invitation.** Le lien de l'e-mail est maintenant
+`http://localhost:5173/?invitation=<jeton>` (variable `FRONTEND_URL`).
+1. Au chargement, `App.tsx` voit `?invitation=` dans l'adresse et affiche la page
+   d'acceptation avant tout le reste.
+2. `GET /auth/invitations/{jeton}` donne l'usine, l'e-mail (non modifiable) et le rôle.
+   Lien inconnu ou annulé (404), expiré (410) ou déjà utilisé (409) : une phrase claire
+   dit quoi faire, avec un bouton vers la connexion.
+3. Le collègue choisit son nom et son mot de passe (mêmes règles que l'inscription) ;
+   `POST /auth/accept-invitation` renvoie un jeton : il est connecté directement.
+4. Le jeton d'invitation est **retiré de l'adresse** (`history.replaceState`) pour ne pas
+   rester dans l'historique du navigateur.
+5. Déjà connecté avec un autre compte : la page propose de se déconnecter d'abord.
+
+**Super-administrateur.** Son compte n'a pas d'usine : au lieu des 6 écrans, il voit
+« Suivi de la plateforme » (`AdminPage.tsx`) : les workers Celery qui répondent
+(`GET /admin/workers`, avec un bandeau rouge si aucun ne répond), puis un tableau des
+usines (`GET /admin/organizations`) : plan (changeable en deux clics), membres,
+machines et mesures du jour avec leurs barres, alertes actives, dernière mesure.
+Comme dans l'API, il ne voit que des compteurs, jamais les mesures d'une usine.
+
+**Mode sombre.** Bouton lune / soleil en haut à droite (aussi sur l'écran de connexion).
+1. Les écrans n'utilisent pas de couleur « brute » (`slate-200`, `red-50`) mais des
+   couleurs **qui ont un sens** : `bg-surface` (carte), `text-ink-muted` (texte discret),
+   `border-line`, `bg-danger-soft`… Elles sont définies dans `src/index.css` comme
+   **variables CSS**, une fois pour le clair (`:root`) et une fois pour le sombre (`.dark`).
+2. Changer de thème = ajouter ou retirer la classe `dark` sur `<html>` (`theme.tsx`) :
+   aucun écran n'a besoin de le savoir, même le graphique SVG suit.
+3. Au premier passage, le thème suit le **réglage du système** ; dès que l'utilisateur
+   clique, son choix est retenu (`localStorage`, clé `maintai.theme`).
+4. Un petit script dans `index.html` applique le thème **avant** l'affichage : sinon la
+   page apparaîtrait blanche une fraction de seconde en mode sombre.
+5. Contrastes vérifiés dans les deux thèmes (texte au moins 4,5 fois plus clair ou plus
+   foncé que son fond, règle d'accessibilité WCAG AA).
+
+**Rafraîchissement automatique.** Les écrans Alertes, Détail d'une machine, modèle d'IA
+et super-administrateur se rechargent seuls grâce à `usePolling` (`src/hooks.ts`) : pas
+d'appel quand l'onglet est caché, rechargement immédiat quand on y revient, et jamais
+deux chargements en même temps si l'API est lente.
+
+**API éteinte au chargement.** Si l'API ne répond pas quand on rouvre la page,
+l'utilisateur **n'est pas déconnecté** (son jeton est peut-être encore bon) : un écran
+explique le problème avec un bouton « Réessayer ». Seule une vraie réponse 401 efface
+le jeton.
+
 **Ajout à l'API pour cet écran.** `GET /machines/{id}/mesures` renvoyait déjà le risque,
 le seuil, le mode probable et les contributions. Il renvoie maintenant aussi ce que le
 worker avait déjà calculé et gardé en base : `mode_probabilities` (probabilité de chaque
@@ -933,8 +1036,9 @@ quelle, JavaScript la prendrait pour une heure *locale* : `parseApiDate` ajoute 
 affiche une phrase claire pour ce type, puis le message exact du serveur. Si l'API est
 éteinte, le message dit quoi faire (`docker compose up -d`).
 
-**Deux langues.** `src/i18n.tsx` contient un dictionnaire français et un anglais avec
-**les mêmes clés** ; TypeScript refuse de compiler si une traduction manque. Le bouton
+**Deux langues.** `src/locales/fr.ts` et `src/locales/en.ts` contiennent un dictionnaire
+français et un anglais avec **les mêmes clés** ; TypeScript refuse de compiler si une
+traduction manque. `src/i18n.tsx` fournit `t()` et les formats de date et de nombre. Le bouton
 en haut à droite change de langue, le choix est retenu. L'API répond en français : les
 messages connus (mauvais mot de passe, e-mail déjà utilisé…) sont traduits en anglais,
 les autres sont affichés tels quels.
@@ -961,6 +1065,14 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
   sélectionnée et le message dit de faire Ctrl+C.
 - **Le front-end appelle l'API directement** (et non via un proxy de Vite) : c'est ce
   qui se passera en production, et cela vérifie vraiment le réglage CORS.
+- **Couleurs par variables CSS** plutôt que `dark:` sur chaque classe : un seul endroit
+  à modifier pour changer une couleur, et un nouvel écran est sombre « gratuitement ».
+- **Actions en deux clics** (`ConfirmAction`) plutôt que `window.confirm` : le texte
+  d'explication est traduit, stylé, et l'erreur de l'API s'affiche au même endroit.
+- **Liens d'invitation vers le front-end React** (`FRONTEND_URL=http://localhost:5173`) :
+  le tableau de bord Streamlit sait toujours accepter le même lien si on remet 8501.
+- **Les boutons cachés ne sont qu'un confort** : un membre ne voit pas « Inviter », mais
+  c'est l'API qui refuse vraiment (403). Le front-end n'est jamais la sécurité.
 
 ### 12 bis.6 Vérification
 - `npm run build` : TypeScript vérifie tout le code, puis Vite fabrique la version finale.
@@ -980,6 +1092,15 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
   nouvelles mesures arrivent, machine sans mesure, identifiant inconnu, anglais, téléphone.
 - Test de l'API `tests/test_mesures.py::test_lot_valide_accepte_et_risque_calcule` : probabilités
   des modes (PWF en tête pour une panne PWF), et base + contributions = risque.
+- Essai réel des compléments : remplacer / révoquer la clé et archiver une machine ;
+  réglages (aperçu du ratio 10 = seuil 22,7 %, 85,3 % de pannes détectées, 74 fausses
+  alertes, comme le tableau de la section 7 ; valeur invalide refusée ; enregistrement) ;
+  refus du plan Gratuit avec 5 machines ; export CSV (réponse 200 `text/csv` depuis
+  5173) ; réentraînement sans données étiquetées (échec expliqué) ; invitation envoyée,
+  lien lu dans Mailpit, page d'acceptation, connexion du nouveau membre, vues en lecture
+  seule du membre, changement de rôle, retrait, annulation d'une invitation, lien déjà
+  utilisé ; écran du super-administrateur (workers, usines, changement de plan) ; mode
+  sombre et mode clair sur tous les écrans.
 
 ### 12 bis.7 Fichiers
 | Fichier | Rôle |
@@ -988,15 +1109,24 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
 | `frontend/vite.config.ts` | Vite + React + Tailwind, port 5173 fixe |
 | `frontend/src/api.ts` | **tous** les appels à l'API, jeton, erreurs |
 | `frontend/src/auth.tsx` | session : connexion, inscription, déconnexion, expiration |
-| `frontend/src/i18n.tsx` | traductions français / anglais |
-| `frontend/src/components/ui.tsx` | boutons, champs, messages d'erreur, chargement |
+| `frontend/src/i18n.tsx` | fonction `t()`, formats de date et de nombre, messages d'erreur |
+| `frontend/src/locales/fr.ts`, `en.ts` | textes français et anglais (mêmes clés) |
+| `frontend/src/theme.tsx`, `src/index.css` | thème clair / sombre et couleurs par variables CSS |
+| `frontend/src/hooks.ts` | `usePolling` (rafraîchissement) et `useTimeout` |
+| `frontend/src/components/ui.tsx` | boutons, champs, cartes, pastilles, barres, messages, chargement |
+| `frontend/src/components/ConfirmAction.tsx` | action importante en deux clics |
+| `frontend/src/components/ThemeToggle.tsx` | bouton lune / soleil |
+| `frontend/src/pages/SettingsPage.tsx` | écran 5 : réglages, plan, export, modèle |
+| `frontend/src/pages/TeamPage.tsx` | écran 6 : membres, rôles, invitations |
+| `frontend/src/pages/AcceptInvitationPage.tsx` | page ouverte par le lien d'invitation |
+| `frontend/src/pages/AdminPage.tsx` | écran du super-administrateur |
 | `frontend/src/pages/AuthPage.tsx` | écran 1 : connexion et inscription |
 | `frontend/src/pages/MachinesPage.tsx` | écran 2 : liste et ajout des machines |
 | `frontend/src/components/NewKeyDialog.tsx` | fenêtre qui montre la clé une seule fois |
 | `frontend/src/pages/AlertsPage.tsx` | écran 3 : alertes actives, acquittement, historique |
 | `frontend/src/pages/MachineDetailPage.tsx` | écran 4 : détail d'une machine |
 | `frontend/src/components/RiskChart.tsx` | graphique du risque en SVG |
-| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`, `#/machines/<id>`, `#/alerts`) |
+| `frontend/src/router.ts` | navigation par l'adresse (`#/machines`, `#/machines/<id>`, `#/alerts`, `#/settings`, `#/team`) |
 | `frontend/src/App.tsx` | en-tête (menu, langue, déconnexion) et choix de l'écran |
 
 ---

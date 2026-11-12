@@ -7,7 +7,7 @@ import {
 } from "../api";
 import { useI18n } from "../i18n";
 import { hrefFor } from "../router";
-import { ErrorBox, Notice, Spinner } from "../components/ui";
+import { Badge, EmptyState, ErrorBox, Notice, Spinner } from "../components/ui";
 import RiskChart from "../components/RiskChart";
 import { usePolling } from "../hooks";
 
@@ -40,7 +40,7 @@ export default function MachineDetailPage({ id }: { id: string }) {
 
   usePolling(load, REFRESH_MS);
 
-  const back = <a href={hrefFor({ page: "machines" })} className="text-sm text-blue-700 hover:underline">{t("detail.back")}</a>;
+  const back = <a href={hrefFor({ page: "machines" })} className="text-sm text-accent-ink hover:underline">{t("detail.back")}</a>;
 
   if (loadError != null && machine === undefined) return <div className="space-y-4">{back}<ErrorBox error={loadError} onRetry={() => void load()} /></div>;
   if (machine === undefined) return <Spinner />;
@@ -58,26 +58,20 @@ export default function MachineDetailPage({ id }: { id: string }) {
       {back}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h1 className="text-2xl font-bold">{machine.name}</h1>
-        <span className={`rounded-full px-2 py-0.5 text-xs ${
-          machine.status === "ACTIVE" ? "bg-green-100 text-green-800" : "bg-slate-200 text-slate-600"}`}>
-          {t(`status.${machine.status}`)}
-        </span>
-        <code className="text-xs text-slate-500">{t("detail.keyPrefix", { prefix: machine.api_key_prefix })}</code>
+        <Badge tone={machine.status === "ACTIVE" ? "success" : "neutral"}>{t(`status.${machine.status}`)}</Badge>
+        <code className="text-xs text-ink-muted">{t("detail.keyPrefix", { prefix: machine.api_key_prefix })}</code>
       </div>
 
       {loadError != null && <ErrorBox error={loadError} onRetry={() => void load()} />}
       {pending > 0 && <Notice>{t("detail.pending", { n: String(pending) })}</Notice>}
 
       {measures == null ? <Spinner /> : scored.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-slate-300 p-6 text-center">
-          <p className="font-medium">{t("detail.emptyTitle")}</p>
-          <p className="mt-1 text-sm text-slate-500">{t("detail.emptyText")}</p>
-        </div>
+        <EmptyState title={t("detail.emptyTitle")}>{t("detail.emptyText")}</EmptyState>
       ) : (
         <>
-          <section className="space-y-2 rounded-lg bg-white p-4 shadow">
+          <section className="space-y-2 rounded-lg border border-line bg-surface p-4 shadow-sm">
             <h2 className="text-lg font-semibold">{t("detail.chartTitle", { n: String(scored.length) })}</h2>
-            <p className="text-sm text-slate-500">{t("detail.chartHelp")}</p>
+            <p className="text-sm text-ink-muted">{t("detail.chartHelp")}</p>
             <RiskChart
               points={scored.map((m) => ({ risk: m.prediction.risk_score, threshold: m.prediction.threshold }))}
               selected={index}
@@ -101,10 +95,10 @@ export default function MachineDetailPage({ id }: { id: string }) {
 function MeasureNav({ index, count, measure, onSelect }:
   { index: number; count: number; measure: Measure; onSelect: (i: number) => void }) {
   const { t, formatDate } = useI18n();
-  const btn = "rounded-md border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-100 disabled:text-slate-300";
+  const btn = "rounded-md border border-line-strong bg-surface px-2 py-1 text-sm hover:bg-track disabled:text-ink-faint";
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-slate-700" aria-live="polite">
+      <p className="text-sm text-ink-soft" aria-live="polite">
         {t("detail.selected", {
           date: formatDate(parseApiDate(measure.timestamp)), pos: String(index + 1), n: String(count),
         })}
@@ -121,12 +115,12 @@ function MeasureNav({ index, count, measure, onSelect }:
 function RiskSummary({ prediction: p }: { prediction: Prediction }) {
   const { t, formatPercent } = useI18n();
   return (
-    <section className={`rounded-lg border-l-4 bg-white p-4 shadow ${p.decision ? "border-red-500" : "border-green-500"}`}>
-      <p className="text-xs text-slate-500">{t("detail.risk")}</p>
-      <p className={`text-3xl font-bold ${p.decision ? "text-red-700" : "text-green-700"}`}>{formatPercent(p.risk_score)}</p>
+    <section className={`rounded-lg border-l-4 bg-surface p-4 shadow ${p.decision ? "border-l-danger" : "border-l-success"}`}>
+      <p className="text-xs text-ink-muted">{t("detail.risk")}</p>
+      <p className={`text-3xl font-bold ${p.decision ? "text-danger-ink" : "text-success-ink"}`}>{formatPercent(p.risk_score)}</p>
       <p className="text-sm">{t(p.decision ? "detail.above" : "detail.below", { threshold: formatPercent(p.threshold) })}</p>
-      {p.explanation && <p className="mt-2 text-sm text-slate-600">{t("alerts.details")} {p.explanation}</p>}
-      <p className="mt-1 text-xs text-slate-400">{t("detail.model", { version: p.model_version })}</p>
+      {p.explanation && <p className="mt-2 text-sm text-ink-soft">{t("alerts.details")} {p.explanation}</p>}
+      <p className="mt-1 text-xs text-ink-faint">{t("detail.model", { version: p.model_version })}</p>
     </section>
   );
 }
@@ -136,12 +130,12 @@ function ModesPanel({ prediction: p }: { prediction: Prediction }) {
   const probs = Object.entries(p.mode_probabilities ?? {}) as [FailureMode, number][];
   probs.sort((a, b) => b[1] - a[1]);
   return (
-    <section className="space-y-3 rounded-lg bg-white p-4 shadow">
+    <section className="space-y-3 rounded-lg border border-line bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{t("detail.modeTitle")}</h2>
       <p className="text-base font-semibold">{p.probable_mode ? t(`mode.${p.probable_mode}`) : t("detail.modeNone")}</p>
-      {probs.length === 0 ? <p className="text-sm text-slate-500">{t("detail.modesUnavailable")}</p> : (
+      {probs.length === 0 ? <p className="text-sm text-ink-muted">{t("detail.modesUnavailable")}</p> : (
         <>
-          <p className="text-sm text-slate-500">{t("detail.modeHelp")}</p>
+          <p className="text-sm text-ink-muted">{t("detail.modeHelp")}</p>
           <ul className="space-y-2">
             {probs.map(([mode, value]) => {
               const flagged = p.flagged_modes?.includes(mode) ?? false;
@@ -149,10 +143,10 @@ function ModesPanel({ prediction: p }: { prediction: Prediction }) {
                 <li key={mode} className="text-sm">
                   <div className="flex justify-between gap-2">
                     <span className={flagged ? "font-semibold" : ""}>{t(`mode.${mode}`)}</span>
-                    <span className={flagged ? "font-semibold" : "text-slate-600"}>{formatPercent(value)}</span>
+                    <span className={flagged ? "font-semibold" : "text-ink-soft"}>{formatPercent(value)}</span>
                   </div>
-                  <div className="mt-1 h-2 rounded bg-slate-100">
-                    <div className={`h-2 rounded ${flagged ? "bg-red-500" : "bg-slate-400"}`}
+                  <div className="mt-1 h-2 rounded bg-track">
+                    <div className={`h-2 rounded ${flagged ? "bg-danger" : "bg-ink-faint"}`}
                       style={{ width: `${Math.max(1, value * 100)}%` }} />
                   </div>
                 </li>
@@ -170,9 +164,9 @@ function ContributionsPanel({ measure }: { measure: Scored }) {
   const p = measure.prediction;
   if (!p.contributions) {
     return (
-      <section className="rounded-lg bg-white p-4 shadow">
+      <section className="rounded-lg border border-line bg-surface p-4 shadow-sm">
         <h2 className="text-lg font-semibold">{t("detail.contribTitle")}</h2>
-        <p className="text-sm text-slate-500">{t("detail.contribUnavailable")}</p>
+        <p className="text-sm text-ink-muted">{t("detail.contribUnavailable")}</p>
       </section>
     );
   }
@@ -182,16 +176,16 @@ function ContributionsPanel({ measure }: { measure: Scored }) {
   const rows = [...SENSORS].sort((a, b) => Math.abs(p.contributions![b]) - Math.abs(p.contributions![a]));
 
   return (
-    <section className="space-y-3 rounded-lg bg-white p-4 shadow">
+    <section className="space-y-3 rounded-lg border border-line bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{t("detail.contribTitle")}</h2>
       {p.base_risk != null && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-muted">
           {t("detail.contribHelp", { base: formatPercent(p.base_risk), risk: formatPercent(p.risk_score) })}
         </p>
       )}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="text-xs text-slate-500">
+          <thead className="text-xs text-ink-muted">
             <tr>
               <th className="py-1 pr-2 font-medium">{t("detail.colSensor")}</th>
               <th className="py-1 pr-2 text-right font-medium">{t("detail.colValue")}</th>
@@ -204,21 +198,21 @@ function ContributionsPanel({ measure }: { measure: Scored }) {
               const c = p.contributions![s];
               const pts = c * 100;   // 1 point = 1 % de risque
               return (
-                <tr key={s} className="border-t border-slate-100">
+                <tr key={s} className="border-t border-line">
                   <td className="py-1.5 pr-2">{t(`sensor.${s}`)}</td>
                   <td className="whitespace-nowrap py-1.5 pr-2 text-right">{formatNumber(measure[s])} {unit(s)}</td>
-                  <td className="whitespace-nowrap py-1.5 pr-2 text-right text-slate-500">
+                  <td className="whitespace-nowrap py-1.5 pr-2 text-right text-ink-muted">
                     {p.reference ? `${formatNumber(p.reference[s])} ${unit(s)}` : "—"}
                   </td>
                   <td className="min-w-40 py-1.5">
                     {/* barre centrée sur 0 : à droite (rouge) fait monter, à gauche (vert) fait baisser */}
                     <div className="flex items-center gap-2">
-                      <div className="relative h-3 flex-1 rounded bg-slate-100">
-                        <div className="absolute inset-y-0 left-1/2 w-px bg-slate-400" />
-                        <div className={`absolute inset-y-0 rounded ${c >= 0 ? "left-1/2 bg-red-500" : "right-1/2 bg-green-500"}`}
+                      <div className="relative h-3 flex-1 rounded bg-track">
+                        <div className="absolute inset-y-0 left-1/2 w-px bg-ink-faint" />
+                        <div className={`absolute inset-y-0 rounded ${c >= 0 ? "left-1/2 bg-danger" : "right-1/2 bg-success"}`}
                           style={{ width: `${(Math.abs(c) / max) * 50}%` }} />
                       </div>
-                      <span className={`w-16 text-right text-xs ${c > 0.005 ? "text-red-700" : c < -0.005 ? "text-green-700" : "text-slate-500"}`}>
+                      <span className={`w-16 text-right text-xs ${c > 0.005 ? "text-danger-ink" : c < -0.005 ? "text-success-ink" : "text-ink-muted"}`}>
                         {t("detail.points", { value: `${pts >= 0 ? "+" : ""}${formatNumber(pts, 1)}` })}
                       </span>
                     </div>

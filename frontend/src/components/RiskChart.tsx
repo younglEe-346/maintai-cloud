@@ -39,8 +39,8 @@ export default function RiskChart({ points, selected, onSelect }:
       {/* graduations horizontales 0 %, 25 %, 50 %, 75 %, 100 % */}
       {[0, 0.25, 0.5, 0.75, 1].map((v) => (
         <g key={v}>
-          <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="stroke-slate-200" />
-          <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-slate-500 text-[11px]">
+          <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="stroke-line-strong" />
+          <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-ink-muted text-[11px]">
             {Math.round(v * 100)} %
           </text>
         </g>
@@ -48,24 +48,24 @@ export default function RiskChart({ points, selected, onSelect }:
 
       {/* seuil d'alerte */}
       <line x1={PAD.left} x2={W - PAD.right} y1={y(threshold)} y2={y(threshold)}
-        strokeDasharray="6 4" className="stroke-red-500" />
-      <text x={W - PAD.right} y={y(threshold) - 5} textAnchor="end" className="fill-red-600 text-[11px]">
+        strokeDasharray="6 4" className="stroke-danger" />
+      <text x={W - PAD.right} y={y(threshold) - 5} textAnchor="end" className="fill-danger text-[11px]">
         {t("detail.threshold", { value: formatPercent(threshold) })}
       </text>
 
       {/* courbe et points (rouges au-dessus du seuil) */}
-      <path d={line} fill="none" strokeWidth={1.5} className="stroke-blue-600" />
+      <path d={line} fill="none" strokeWidth={1.5} className="stroke-accent" />
       {points.map((p, i) => (
         <circle key={i} cx={x(i)} cy={y(p.risk)} r={n > 80 ? 2 : 3}
-          className={p.risk >= p.threshold ? "fill-red-600" : "fill-blue-600"} />
+          className={p.risk >= p.threshold ? "fill-danger" : "fill-accent"} />
       ))}
 
       {/* mesure sélectionnée */}
-      <line x1={x(selected)} x2={x(selected)} y1={PAD.top} y2={H - PAD.bottom} className="stroke-slate-400" />
-      <circle cx={x(selected)} cy={y(points[selected].risk)} r={6} fill="none" strokeWidth={2} className="stroke-slate-900" />
+      <line x1={x(selected)} x2={x(selected)} y1={PAD.top} y2={H - PAD.bottom} className="stroke-ink-faint" />
+      <circle cx={x(selected)} cy={y(points[selected].risk)} r={6} fill="none" strokeWidth={2} className="stroke-ink" />
 
-      <text x={PAD.left} y={H - 8} className="fill-slate-500 text-[11px]">{t("detail.older")}</text>
-      <text x={W - PAD.right} y={H - 8} textAnchor="end" className="fill-slate-500 text-[11px]">{t("detail.newer")}</text>
+      <text x={PAD.left} y={H - 8} className="fill-ink-muted text-[11px]">{t("detail.older")}</text>
+      <text x={W - PAD.right} y={H - 8} textAnchor="end" className="fill-ink-muted text-[11px]">{t("detail.newer")}</text>
 
       {/* zone cliquable transparente posée au-dessus */}
       <rect x={PAD.left} y={PAD.top} width={PLOT_W} height={PLOT_H} fill="transparent"

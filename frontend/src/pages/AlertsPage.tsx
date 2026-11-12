@@ -4,7 +4,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { ApiError, alertsApi, machinesApi, parseApiDate, type Alert } from "../api";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
-import { Button, ErrorBox, Notice, Spinner } from "../components/ui";
+import { Badge, Button, EmptyState, ErrorBox, Notice, Spinner, TextAreaField } from "../components/ui";
 import { usePolling, useTimeout } from "../hooks";
 
 const REFRESH_MS = 10_000;
@@ -38,10 +38,10 @@ export default function AlertsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl">
           <h1 className="text-2xl font-bold">{t("alerts.title")}</h1>
-          <p className="text-slate-500">{t("alerts.intro")}</p>
+          <p className="text-ink-muted">{t("alerts.intro")}</p>
         </div>
         <div className="flex items-center gap-3">
-          {data && <span className="text-xs text-slate-500">{t("common.updatedAt", { time: formatTime(data.loadedAt) })}</span>}
+          {data && <span className="text-xs text-ink-muted">{t("common.updatedAt", { time: formatTime(data.loadedAt) })}</span>}
           <Button variant="secondary" onClick={() => void load()}>{t("common.refresh")}</Button>
         </div>
       </div>
@@ -52,10 +52,7 @@ export default function AlertsPage() {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold">{t("alerts.activeTitle")} ({data.active.length})</h2>
             {data.active.length === 0 ? (
-              <div className="rounded-lg border-2 border-dashed border-slate-300 p-6 text-center">
-                <p className="font-medium">{t("alerts.emptyActiveTitle")}</p>
-                <p className="mt-1 text-sm text-slate-500">{t("alerts.emptyActiveText")}</p>
-              </div>
+              <EmptyState title={t("alerts.emptyActiveTitle")}>{t("alerts.emptyActiveText")}</EmptyState>
             ) : (
               data.active.map((a) => (
                 <AlertCard key={a.id} alert={a} machineName={machineName(a.machine_id)} onChanged={() => void load()} />
@@ -66,7 +63,7 @@ export default function AlertsPage() {
           <section className="space-y-2">
             <h2 className="text-lg font-semibold">{t("alerts.historyTitle")}</h2>
             {data.closed.length === 0
-              ? <p className="text-sm text-slate-500">{t("alerts.emptyHistory")}</p>
+              ? <p className="text-sm text-ink-muted">{t("alerts.emptyHistory")}</p>
               : <HistoryTable alerts={data.closed} machineName={machineName} />}
           </section>
         </>
@@ -92,39 +89,36 @@ function AlertCard({ alert, machineName, onChanged }: { alert: Alert; machineNam
   ];
 
   return (
-    <article className={`rounded-lg border-l-4 bg-white p-4 shadow ${open ? "border-red-500" : "border-amber-400"}`}>
+    <article className={`rounded-lg border border-l-4 border-line bg-surface p-4 shadow-sm ${open ? "border-l-danger" : "border-l-warning"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-base font-semibold">{machineName}</h3>
-          <p className="text-xs text-slate-500">{t("alerts.openedAt", { date: formatDate(parseApiDate(alert.created_at)) })}</p>
+          <p className="text-xs text-ink-muted">{t("alerts.openedAt", { date: formatDate(parseApiDate(alert.created_at)) })}</p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-          open ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-900"}`}>
-          {t(`alerts.status.${alert.status}`)}
-        </span>
+        <Badge tone={open ? "danger" : "warning"}>{t(`alerts.status.${alert.status}`)}</Badge>
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         {risks.map(([label, value]) => (
           <div key={label}>
-            <dt className="text-xs text-slate-500">{label}</dt>
+            <dt className="text-xs text-ink-muted">{label}</dt>
             <dd className="font-semibold">{value == null ? "—" : formatPercent(value)}</dd>
           </div>
         ))}
         <div>
-          <dt className="text-xs text-slate-500">{t("alerts.mode")}</dt>
+          <dt className="text-xs text-ink-muted">{t("alerts.mode")}</dt>
           <dd className="font-semibold"><ModeText alert={alert} /></dd>
         </div>
       </dl>
 
       {alert.details && (
-        <p className="mt-3 text-sm text-slate-700">
-          <span className="text-slate-500">{t("alerts.details")} </span>{alert.details}
+        <p className="mt-3 text-sm text-ink-soft">
+          <span className="text-ink-muted">{t("alerts.details")} </span>{alert.details}
         </p>
       )}
 
       {alert.status === "ACKNOWLEDGED" ? (
-        <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mt-3 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning-ink">
           <p>{t("alerts.ackBy", {
             name: alert.acknowledged_by_name ?? "—",
             date: alert.acknowledged_at ? formatDate(parseApiDate(alert.acknowledged_at)) : "—",
@@ -173,28 +167,16 @@ function AckForm({ alertId, onCancel, onDone }: { alertId: string; onCancel: () 
   const commentId = `ack-comment-${alertId}`;
 
   return (
-    <form onSubmit={submit} className="mt-3 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+    <form onSubmit={submit} className="mt-3 space-y-3 rounded-md border border-line bg-surface-2 p-3">
       <h4 className="text-sm font-semibold">{t("alerts.ackFormTitle")}</h4>
       <div>
-        <p className="text-xs text-slate-500">{t("alerts.ackAs")}</p>
+        <p className="text-xs text-ink-muted">{t("alerts.ackAs")}</p>
         <p className="text-sm font-medium">{name}</p>
-        <p className="text-xs text-slate-500">{t("alerts.ackAsHint")}</p>
+        <p className="text-xs text-ink-muted">{t("alerts.ackAsHint")}</p>
       </div>
-      <div className="space-y-1">
-        <label htmlFor={commentId} className="block text-sm font-medium text-slate-700">{t("alerts.comment")}</label>
-        <textarea
-          id={commentId}
-          rows={3}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          aria-invalid={tooLong || undefined}
-          className={`block w-full rounded-md border px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 ${
-            tooLong ? "border-red-400 focus:ring-red-300" : "border-slate-300 focus:ring-blue-300"}`}
-        />
-        <p className={`text-xs ${tooLong ? "text-red-600" : "text-slate-500"}`}>
-          {tooLong ? t("alerts.commentTooLong") : t("alerts.commentHint")}
-        </p>
-      </div>
+      <TextAreaField id={commentId} label={t("alerts.comment")} rows={3} value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        hint={t("alerts.commentHint")} error={tooLong ? t("alerts.commentTooLong") : undefined} />
       {apiError != null && <ErrorBox error={apiError} />}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={sending || tooLong}>{sending ? t("alerts.acking") : t("alerts.ackConfirm")}</Button>
@@ -209,9 +191,9 @@ function HistoryTable({ alerts, machineName }: { alerts: Alert[]; machineName: (
   const { t, formatDate, formatPercent } = useI18n();
   const cell = "px-4 py-2";
   return (
-    <div className="overflow-x-auto rounded-lg bg-white shadow">
+    <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-sm">
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-slate-200 text-slate-500">
+        <thead className="border-b border-line text-ink-muted">
           <tr>
             {(["alerts.colMachine", "alerts.colOpened", "alerts.colClosed", "alerts.colPeak", "alerts.colMode", "alerts.colAck"] as const)
               .map((key) => <th key={key} className={`${cell} font-medium`}>{t(key)}</th>)}
@@ -219,7 +201,7 @@ function HistoryTable({ alerts, machineName }: { alerts: Alert[]; machineName: (
         </thead>
         <tbody>
           {alerts.map((a) => (
-            <tr key={a.id} className="border-b border-slate-100 last:border-0">
+            <tr key={a.id} className="border-b border-line last:border-0">
               <td className={`${cell} font-medium`}>{machineName(a.machine_id)}</td>
               <td className={`${cell} whitespace-nowrap`}>{formatDate(parseApiDate(a.created_at))}</td>
               <td className={`${cell} whitespace-nowrap`}>{a.closed_at ? formatDate(parseApiDate(a.closed_at)) : "—"}</td>
@@ -227,7 +209,7 @@ function HistoryTable({ alerts, machineName }: { alerts: Alert[]; machineName: (
               <td className={cell}><ModeText alert={a} /></td>
               <td className={cell}>
                 {a.acknowledged_by_name ?? "—"}
-                {a.ack_comment && <span className="block text-xs text-slate-500">{a.ack_comment}</span>}
+                {a.ack_comment && <span className="block text-xs text-ink-muted">{a.ack_comment}</span>}
               </td>
             </tr>
           ))}

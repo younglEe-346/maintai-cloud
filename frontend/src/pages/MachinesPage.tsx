@@ -7,7 +7,7 @@ import {
 } from "../api";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n";
-import { Button, ErrorBox, Field, Notice, Spinner } from "../components/ui";
+import { Badge, Button, EmptyState, ErrorBox, Field, Notice, Spinner } from "../components/ui";
 import NewKeyDialog from "../components/NewKeyDialog";
 import { hrefFor } from "../router";
 
@@ -41,9 +41,9 @@ export default function MachinesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t("machines.title")}</h1>
-        <p className="text-slate-500">{t("machines.intro")}</p>
+        <p className="text-ink-muted">{t("machines.intro")}</p>
         {org && (
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-ink-soft">
             {t("machines.usage", {
               count: String(org.machines), max: String(org.limits.max_machines), plan: t(`plan.${org.plan}`),
             })}
@@ -66,10 +66,7 @@ export default function MachinesPage() {
         ) : machines == null ? (
           <Spinner />
         ) : machines.length === 0 ? (
-          <div className="rounded-lg border-2 border-dashed border-slate-300 p-6 text-center">
-            <p className="font-medium">{t("machines.emptyTitle")}</p>
-            <p className="mt-1 text-sm text-slate-500">{t(canManage ? "machines.emptyText" : "machines.emptyMember")}</p>
-          </div>
+          <EmptyState title={t("machines.emptyTitle")}>{t(canManage ? "machines.emptyText" : "machines.emptyMember")}</EmptyState>
         ) : (
           <MachineTable machines={machines} />
         )}
@@ -110,7 +107,7 @@ function AddMachineForm({ onCreated }: { onCreated: (m: MachineWithKey) => void 
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-3 rounded-lg bg-white p-4 shadow">
+    <form onSubmit={submit} noValidate className="space-y-3 rounded-lg border border-line bg-surface p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{t("machines.addTitle")}</h2>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex-1">
@@ -130,9 +127,9 @@ function MachineTable({ machines }: { machines: Machine[] }) {
   const { t, formatDate } = useI18n();
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg bg-white shadow">
+      <div className="overflow-x-auto rounded-lg border border-line bg-surface shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-slate-500">
+          <thead className="border-b border-line text-ink-muted">
             <tr>
               <th className="px-4 py-2 font-medium">{t("machines.colName")}</th>
               <th className="px-4 py-2 font-medium">{t("machines.colStatus")}</th>
@@ -142,29 +139,26 @@ function MachineTable({ machines }: { machines: Machine[] }) {
           </thead>
           <tbody>
             {machines.map((m) => (
-              <tr key={m.id} className="border-b border-slate-100 last:border-0">
+              <tr key={m.id} className="border-b border-line last:border-0">
                 <td className="px-4 py-2 font-medium">
-                  <a href={hrefFor({ page: "machine", id: m.id })} className="text-blue-700 hover:underline">{m.name}</a>
+                  <a href={hrefFor({ page: "machine", id: m.id })} className="text-accent-ink hover:underline">{m.name}</a>
                 </td>
                 <td className="px-4 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${
-                    m.status === "ACTIVE" ? "bg-green-100 text-green-800" : "bg-slate-200 text-slate-600"}`}>
-                    {t(`status.${m.status}`)}
-                  </span>
+                  <Badge tone={m.status === "ACTIVE" ? "success" : "neutral"}>{t(`status.${m.status}`)}</Badge>
                 </td>
                 <td className="px-4 py-2">
                   <code className="text-xs">{m.api_key_prefix}…</code>{" "}
-                  <span className={`text-xs ${m.api_key_revoked_at ? "text-red-600" : "text-slate-500"}`}>
+                  <span className={`text-xs ${m.api_key_revoked_at ? "text-danger-ink" : "text-ink-muted"}`}>
                     ({t(m.api_key_revoked_at ? "key.revoked" : "key.active")})
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-slate-600">{formatDate(parseApiDate(m.created_at))}</td>
+                <td className="whitespace-nowrap px-4 py-2 text-ink-soft">{formatDate(parseApiDate(m.created_at))}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-500">{t("machines.openHint")} {t("machines.keyHelp")}</p>
+      <p className="text-xs text-ink-muted">{t("machines.openHint")} {t("machines.keyHelp")}</p>
     </div>
   );
 }

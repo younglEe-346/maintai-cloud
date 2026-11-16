@@ -88,12 +88,18 @@ def list_measures(
                 **{f: getattr(t, f) for f in RAW_FEATURES},
                 "label_failure": t.label_failure, "label_modes": t.label_modes, "prediction": None}
         if p is not None:
+            modes, contrib = p.failure_modes or {}, p.contributions or {}
             item["prediction"] = {
                 "risk_score": p.risk_score, "decision": p.decision, "threshold": p.threshold,
                 "model_version": p.model_version,
-                "probable_mode": (p.failure_modes or {}).get("probable_mode"),
-                "explanation": (p.contributions or {}).get("explanation"),
-                "contributions": (p.contributions or {}).get("contributions"),
+                "probable_mode": modes.get("probable_mode"),
+                "mode_probabilities": modes.get("probabilities"),  # probabilité de chaque mode
+                "flagged_modes": modes.get("flagged"),             # modes au-dessus de leur seuil
+                "explanation": contrib.get("explanation"),
+                "contributions": contrib.get("contributions"),
+                # risque d'une machine "normale" : base_risk + somme des contributions = risk_score
+                "base_risk": contrib.get("base_risk"),
+                "reference": contrib.get("reference"),             # valeurs normales des mesures
             }
         out.append(item)
     return out

@@ -35,6 +35,7 @@ propres données.
 | `postgres` | base de données | localhost:5432 |
 | `redis` | file de tâches + compteurs de quotas | localhost:6379 |
 | `mailpit` | faux serveur mail (invitations) | http://localhost:8025 |
+| *(hors Docker)* `frontend/` | interface React : `cd frontend && npm install && npm run dev` | http://localhost:5173 |
 | `migrate` | met la base à jour (Alembic) puis s'arrête | — |
 
 ## Démarrage rapide
@@ -63,6 +64,9 @@ propres données.
    ```
    Les comptes des usines de démo sont affichés et enregistrés dans `simulator/config.json`.
 6. Ouvrir le **tableau de bord** http://localhost:8501 et se connecter avec un de ces comptes.
+   Ou l'**interface React** (`cd frontend && npm install && npm run dev`) sur http://localhost:5173 :
+   machines, alertes, réglages, équipe, mode sombre, français / anglais. Les liens
+   d'invitation envoyés par e-mail ouvrent cette interface (`FRONTEND_URL`).
 
 ## Modèle d'IA
 
@@ -116,7 +120,8 @@ ml/train.py    entraînement du modèle commun
 models/        modèles versionnés (joblib + rapport JSON)
 migrations/    migrations Alembic (0001 à 0008)
 simulator/     simulateur multi-usines
-tests/         102 tests pytest
+tests/         104 tests pytest
 docs/          EXPLICATIONS.md
+frontend/      interface React + Vite + TypeScript + Tailwind
 app_frontend.py  tableau de bord Streamlit
 ```

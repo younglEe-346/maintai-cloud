@@ -81,3 +81,19 @@ def test_cors_limite_aux_sites_autorises(client):
         return client.options(f"{API}/machines", headers={"Origin": origin, "Access-Control-Request-Method": "GET"})
     assert preflight("http://localhost:8501").headers.get("access-control-allow-origin") == "http://localhost:8501"
     assert "access-control-allow-origin" not in preflight("https://site-malveillant.example").headers
+
+
+def test_cors_autorise_le_front_end_react(client):
+    """Le front-end React (Vite, port 5173) peut envoyer son jeton ; jamais de "*"."""
+    r = client.options(f"{API}/machines", headers={
+        "Origin": "http://localhost:5173", "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type"})
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    assert "*" not in r.headers.get("access-control-allow-headers", "")
+    assert "access-control-allow-credentials" not in r.headers
+    # un en-tête non prévu est refusé
+    r = client.options(f"{API}/machines", headers={
+        "Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "x-en-tete-inconnu"})
+    assert r.status_code == 400

@@ -66,3 +66,13 @@ def test_autre_usine_ne_touche_pas_aux_cles(client):
     m = create_machine(client, a)
     assert client.post(f"{API}/machines/{m['id']}/api-key/revoke", headers=b["headers"]).status_code == 404
     assert send(client, m["api_key"], ai4i_rows([0])).status_code == 202
+
+
+def test_nom_de_machine_obligatoire(client):
+    """Un nom vide ou fait d'espaces est refusé ; les espaces aux bords sont retirés."""
+    owner = register(client)
+    for name in ["", "   ", "x" * 101]:
+        r = client.post(f"{API}/machines", json={"name": name}, headers=owner["headers"])
+        assert r.status_code == 422, name
+    r = client.post(f"{API}/machines", json={"name": "  Tour CN 1  "}, headers=owner["headers"])
+    assert r.status_code == 201 and r.json()["name"] == "Tour CN 1"

@@ -10,8 +10,11 @@ if SECRET_KEY == DEV_SECRET_KEY:
     import warnings
     warnings.warn("SECRET_KEY non définie : clé de développement utilisée (à changer en production)")
 
-# Sites web autorisés à appeler l'API depuis un navigateur (CORS), séparés par des virgules
-ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8501").split(",") if o.strip()]
+# Sites web autorisés à appeler l'API depuis un navigateur (CORS), séparés par des virgules.
+# Par défaut : le tableau de bord Streamlit (8501) et le front-end React lancé par Vite (5173).
+# Jamais "*" : une adresse précise par site.
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8501,http://localhost:5173").split(",")
+                   if o.strip() and o.strip() != "*"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
@@ -19,7 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))
 SMTP_FROM = os.getenv("SMTP_FROM", "MaintAI Cloud <noreply@maintai.local>")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8501")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")  # front-end React (liens d'invitation)
 INVITATION_DAYS = int(os.getenv("INVITATION_DAYS", "7"))
 
 # Modèles réentraînés par usine (plan Pro) : un sous-dossier par usine

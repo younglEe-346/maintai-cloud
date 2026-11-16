@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Thème clair / sombre
+   Les écrans n'utilisent PAS directement « slate-200 » ou « red-50 » : ils utilisent
+   des couleurs qui ont un SENS (fond de page, carte, texte discret, danger…).
+   Chaque couleur est une variable CSS, définie deux fois : une valeur pour le thème
+   clair (:root) et une pour le thème sombre (.dark sur <html>). Changer de thème =
+   ajouter ou retirer la classe « dark » ; aucun composant n'a besoin de le savoir.
+   --------------------------------------------------------------------------- */
+
+/* Variante dark: pilotée par la classe .dark (et non seulement par le réglage du système). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Déclare les couleurs pour Tailwind : bg-surface, text-ink-muted, border-line, fill-danger… */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-track: var(--track);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-muted: var(--accent-muted);
+  --color-on-accent: var(--on-accent);
+  --color-ring: var(--ring);
+
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-info-ink: var(--info-ink);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+}
+
+/* Thème clair (par défaut) */
+:root {
+  color-scheme: light;          /* cases à cocher, barres de défilement… en clair */
+  --canvas: #f8fafc;            /* fond de la page */
+  --surface: #ffffff;           /* cartes, tableaux, champs */
+  --surface-2: #f1f5f9;         /* zone discrète dans une carte */
+  --ink: #0f172a;               /* texte principal */
+  --ink-soft: #334155;          /* texte courant secondaire */
+  --ink-muted: #64748b;         /* aides, légendes */
+  --ink-faint: #94a3b8;         /* texte désactivé */
+  --line: #e2e8f0;              /* bordures fines */
+  --line-strong: #cbd5e1;       /* bordures des champs */
+  --track: #e2e8f0;             /* fond des barres de progression */
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-ink: #1d4ed8;        /* liens */
+  --accent-muted: #93c5fd;      /* bouton principal désactivé */
+  --on-accent: #ffffff;
+  --ring: #93c5fd;
+
+  --danger: #dc2626;
+  --danger-ink: #991b1b;
+  --danger-soft: #fef2f2;
+  --danger-line: #fecaca;
+  --warning: #f59e0b;
+  --warning-ink: #78350f;
+  --warning-soft: #fffbeb;
+  --warning-line: #fde68a;
+  --success: #16a34a;
+  --success-ink: #166534;
+  --success-soft: #dcfce7;
+  --success-line: #bbf7d0;
+  --info-ink: #1e3a8a;
+  --info-soft: #eff6ff;
+  --info-line: #bfdbfe;
+}
+
+/* Thème sombre : mêmes noms, autres valeurs. Contrastes vérifiés (texte ≥ 4,5:1). */
+.dark {
+  color-scheme: dark;
+  --canvas: #020617;
+  --surface: #0f172a;
+  --surface-2: #1e293b;
+  --ink: #f1f5f9;
+  --ink-soft: #cbd5e1;
+  --ink-muted: #94a3b8;
+  --ink-faint: #64748b;
+  --line: #1e293b;
+  --line-strong: #334155;
+  --track: #1e293b;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-ink: #60a5fa;
+  --accent-muted: #1e3a8a;
+  --on-accent: #ffffff;
+  --ring: #1d4ed8;
+
+  --danger: #ef4444;
+  --danger-ink: #fca5a5;
+  --danger-soft: rgb(127 29 29 / 0.35);
+  --danger-line: #7f1d1d;
+  --warning: #f59e0b;
+  --warning-ink: #fcd34d;
+  --warning-soft: rgb(120 53 15 / 0.35);
+  --warning-line: #78350f;
+  --success: #22c55e;
+  --success-ink: #86efac;
+  --success-soft: rgb(20 83 45 / 0.45);
+  --success-line: #14532d;
+  --info-ink: #93c5fd;
+  --info-soft: rgb(30 58 138 / 0.35);
+  --info-line: #1e3a8a;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+}
+
+/* Passage doux d'un thème à l'autre, sauf si l'utilisateur préfère moins d'animations. */
+@media (prefers-reduced-motion: no-preference) {
+  body, header, section, article, table, input, select, textarea, dialog {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+}

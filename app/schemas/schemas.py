@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Token(BaseModel):
@@ -10,7 +10,9 @@ class Token(BaseModel):
 
 
 class MachineCreate(BaseModel):
-    name: str
+    """Nom affiché de la machine : espaces retirés aux bords, 1 à 100 caractères."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=100)
 
 
 class MachineResponse(BaseModel):

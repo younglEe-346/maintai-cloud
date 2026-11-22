@@ -1139,7 +1139,7 @@ bash scripts/verifier.sh               # démarre tout + tests dans Docker (comm
 TESTS=local bash scripts/verifier.sh   # pareil, tests avec le venv local (moins de mémoire)
 docker compose --profile tools run --rm --build tests   # seulement les tests
 ```
-**102 tests** (pytest). Les tests d'intégration utilisent une **vraie base PostgreSQL**
+**104 tests** (pytest). Les tests d'intégration utilisent une **vraie base PostgreSQL**
 séparée (`maintai_test`, recréée à chaque lancement ; refus de démarrer si le nom ne
 finit pas par `_test`), Redis (base 15) et le **vrai modèle** ; les tâches Celery
 s'exécutent directement dans le processus de test. Les mesures envoyées sont de
@@ -1332,7 +1332,7 @@ des workers, pas les mesures ni les clés. Il est créé en ligne de commande su
 serveur, jamais par l'API.
 
 **20. Comment avez-vous testé ?**
-102 tests pytest sur une vraie base PostgreSQL de test, avec le vrai modèle et de vraies
+104 tests pytest sur une vraie base PostgreSQL de test, avec le vrai modèle et de vraies
 lignes AI4I ; chaque exigence du sujet a ses tests (tableau 13.2). En plus, des
 vérifications de bout en bout sur la plateforme réelle : hystérésis sur 7 lots,
 réentraînement réel (27 s), simulateur sur 3 usines en parallèle, tableau de bord avec
@@ -1357,7 +1357,7 @@ du réentraînement biaisée par AI4I, pas de test de charge à 1 million de mes
 - Simulateur : 3 usines, 7 machines en parallèle ; tableau de bord pour tous les rôles.
 
 ### Ce qui est testé
-102 tests automatiques, tous verts (dans Docker et en local), couvrant chaque exigence
+104 tests automatiques, tous verts (dans Docker et en local), couvrant chaque exigence
 du sujet (tableau 13.2), dont l'isolation entre usines route par route.
 
 ### Ce qui reste à faire ou à améliorer

@@ -36,3 +36,38 @@ export function useTimeout(): (fn: () => void, ms: number) => void {
   useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
   return (fn, ms) => { timers.current.push(window.setTimeout(fn, ms)); };
 }
+
+const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"] as const;
+
+/**
+ * Appelle `onIdle` une seule fois quand l'utilisateur est resté `ms` millisecondes sans rien faire
+ * (clic, souris, touche, molette, toucher). Le rafraîchissement automatique des écrans ne compte PAS comme une activité.
+ * - la durée est mesurée avec l'horloge (`Date.now`) : un ordinateur mis en veille puis rouvert est déconnecté tout de suite ;
+ * - ne fait rien tant que `enabled` est faux (personne n'est connecté).
+ */
+export function useIdleTimeout(onIdle: () => void, ms: number, enabled: boolean): void {
+  const onIdleRef = useRef(onIdle);
+  // toujours la dernière version de `onIdle`, sans relancer le compteur
+  useEffect(() => { onIdleRef.current = onIdle; });
+
+  useEffect(() => {
+    if (!enabled) return;
+    let lastActivity = Date.now();
+    let fired = false;
+    const check = () => {
+      if (!fired && Date.now() - lastActivity >= ms) {
+        fired = true;
+        onIdleRef.current();
+      }
+    };
+    const touch = () => { lastActivity = Date.now(); };
+    const timer = window.setInterval(check, Math.min(ms, 1000));
+    ACTIVITY_EVENTS.forEach((name) => window.addEventListener(name, touch, { passive: true }));
+    document.addEventListener("visibilitychange", check);   // retour sur l'onglet après une longue absence
+    return () => {
+      window.clearInterval(timer);
+      ACTIVITY_EVENTS.forEach((name) => window.removeEventListener(name, touch));
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [ms, enabled]);
+}

@@ -1,14 +1,19 @@
 // Écran du super-administrateur (équipe MaintAI) : suivi des usines et des workers.
 // Il voit des compteurs (machines, mesures du jour, alertes actives), jamais les mesures
 // ni les clés d'une usine : les données des clients restent privées.
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { adminApi, parseApiDate, type AdminOrganization, type WorkersStatus } from "../api";
 import { useI18n } from "../i18n";
 import { usePolling } from "../hooks";
-import { Badge, Card, EmptyState, ErrorBox, Meter, Notice, PageHeader, Spinner, Button, table } from "../components/ui";
+import { Badge, Card, EmptyState, ErrorBox, Field, Meter, Notice, PageHeader, SelectField, Spinner, Button, table } from "../components/ui";
 import ConfirmAction from "../components/ConfirmAction";
 
 const REFRESH_MS = 15_000;
+
+type SortKey = "name" | "machines" | "alerts" | "last";
+
+/** Texte sans accents ni majuscules : « Équipe » est trouvé en tapant « equipe ». */
+const normalize = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 export default function AdminPage() {
   const { t, formatTime } = useI18n();
@@ -77,10 +82,50 @@ function WorkersCard({ status }: { status: WorkersStatus }) {
 }
 
 function OrgsTable({ orgs, onChanged }: { orgs: AdminOrganization[]; onChanged: () => Promise<void> }) {
-  const { t, formatDate, formatNumber } = useI18n();
+  const { t, lang, formatDate, formatNumber } = useI18n();
+  // Recherche, filtre et tri se font ici, dans le navigateur, sur les données déjà reçues : l'API ne change pas.
+  // Ces choix sont gardés quand la liste se rafraîchit toute seule (le composant reste affiché).
+  const [query, setQuery] = useState("");
+  const [onlyAlerts, setOnlyAlerts] = useState(false);
+  const [sort, setSort] = useState<SortKey>("name");
+
+  const shown = useMemo(() => {
+    const needle = normalize(query);
+    const lastTime = (o: AdminOrganization) => (o.last_measure_at ? parseApiDate(o.last_measure_at).getTime() : 0);
+    const compare: Record<SortKey, (a: AdminOrganization, b: AdminOrganization) => number> = {
+      name: (a, b) => a.name.localeCompare(b.name, lang),
+      machines: (a, b) => b.machines - a.machines,
+      alerts: (a, b) => b.active_alerts - a.active_alerts,
+      last: (a, b) => lastTime(b) - lastTime(a),
+    };
+    return orgs
+      .filter((o) => (needle === "" || normalize(o.name).includes(needle)) && (!onlyAlerts || o.active_alerts > 0))
+      .sort((a, b) => compare[sort](a, b) || a.name.localeCompare(b.name, lang));
+  }, [orgs, query, onlyAlerts, sort, lang]);
+
   return (
     <section className="space-y-2">
       <h2 className="text-lg font-semibold">{t("admin.orgsTitle", { n: String(orgs.length) })}</h2>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field id="admin-search" type="search" label={t("admin.search")} placeholder={t("admin.searchPlaceholder")}
+          value={query} onChange={(e) => setQuery(e.target.value)} />
+        <SelectField id="admin-sort" label={t("admin.sort")} value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
+          <option value="name">{t("admin.sortName")}</option>
+          <option value="machines">{t("admin.sortMachines")}</option>
+          <option value="alerts">{t("admin.sortAlerts")}</option>
+          <option value="last">{t("admin.sortLast")}</option>
+        </SelectField>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <label className="flex items-center gap-2 text-ink-soft">
+          <input type="checkbox" checked={onlyAlerts} onChange={(e) => setOnlyAlerts(e.target.checked)} />
+          {t("admin.onlyAlerts")}
+        </label>
+        <span className="text-ink-muted" aria-live="polite">
+          {t("admin.count", { shown: String(shown.length), total: String(orgs.length) })}
+        </span>
+      </div>
+      {shown.length === 0 && <Notice tone="info">{t("admin.noMatch")}</Notice>}
       <div className={table.wrap}>
         <table className={table.table}>
           <thead className={table.head}>
@@ -94,7 +139,7 @@ function OrgsTable({ orgs, onChanged }: { orgs: AdminOrganization[]; onChanged: 
             </tr>
           </thead>
           <tbody>
-            {orgs.map((o) => (
+            {shown.map((o) => (
               <tr key={o.id} className={`${table.row} align-top`}>
                 <td className={table.td}>
                   <p className="font-medium">{o.name}</p>

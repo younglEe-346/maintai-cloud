@@ -81,7 +81,7 @@ comparaison de 3 modèles, test sur 20 % jamais vus, seuil, modes de panne, cont
 ## Tests
 
 ```bash
-bash scripts/verifier.sh               # démarre tout puis lance les 102 tests dans Docker
+bash scripts/verifier.sh               # démarre tout puis lance les 104 tests dans Docker
 TESTS=local bash scripts/verifier.sh   # tests avec le venv local (moins de mémoire)
 ```
 Les tests utilisent une base séparée (`maintai_test`) : ils ne touchent jamais aux vraies données.

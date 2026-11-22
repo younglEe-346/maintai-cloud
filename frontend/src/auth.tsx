@@ -1,6 +1,10 @@
 // Session de l'utilisateur : jeton JWT + profil (GET /auth/me), partagés par toute l'application.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, authApi, setUnauthorizedHandler, tokenStore, type Me, type RegisterInput } from "./api";
+import { useIdleTimeout } from "./hooks";
+
+/** Délai sans activité avant la déconnexion automatique : 60 minutes (une seule constante à régler). */
+export const IDLE_LOGOUT_MS = 60 * 60 * 1000;
 
 /**
  * - loading     : on vérifie le jeton gardé dans le navigateur ;
@@ -13,7 +17,7 @@ type Status = "loading" | "signedOut" | "signedIn" | "unreachable";
 interface Auth {
   status: Status;
   me: Me | null;
-  /** Vrai si l'utilisateur a été déconnecté parce que son jeton a expiré. */
+  /** Vrai si l'utilisateur a été déconnecté parce que son jeton a expiré ou après un long moment d'inactivité. */
   expired: boolean;
   /** Erreur du dernier essai quand status = unreachable. */
   error: unknown;
@@ -41,6 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMe(null);
     setStatus("signedOut");
   }, []);
+
+  // Inactivité : après IDLE_LOGOUT_MS sans activité, retour à l'écran de connexion (même bandeau « session expirée »).
+  // Actif seulement quand quelqu'un est connecté ; le rafraîchissement automatique des écrans ne compte pas comme activité.
+  useIdleTimeout(() => { setExpired(true); logout(); }, IDLE_LOGOUT_MS, status === "signedIn");
 
   // Jeton reçu -> on le garde, puis on demande qui est connecté.
   const startSession = useCallback(async (token: string) => {

@@ -125,7 +125,7 @@ function ManagePanel({ machine, onChanged }: { machine: Machine; onChanged: () =
           onConfirm={async () => { await machinesApi.revokeKey(machine.id); setDone(t("manage.revokeDone")); await onChanged(); }} />
         <ConfirmAction label={t("manage.archive")} help={t("manage.archiveHelp")} confirmLabel={t("manage.archiveConfirm")}
           danger
-          onConfirm={async () => { await machinesApi.archive(machine.id); setDone(t("manage.archiveDone")); await onChanged(); }} />
+          onConfirm={async () => { await machinesApi.archive(machine.id); await onChanged(); }} />
       </div>
       {newKey && (
         <NewKeyDialog key={newKey.api_key_created_at ?? newKey.id} machine={newKey} title={t("newKey.rotatedTitle", { name: newKey.name })}

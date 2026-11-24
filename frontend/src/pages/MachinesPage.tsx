@@ -36,7 +36,7 @@ export default function MachinesPage() {
   useEffect(() => { void load(); }, [load]);
 
   const limitReached = org != null && org.machines >= org.limits.max_machines;
-
+  
   return (
     <div className="space-y-6">
       <div>
@@ -84,6 +84,12 @@ function AddMachineForm({ onCreated }: { onCreated: (m: MachineWithKey) => void 
   const [apiError, setApiError] = useState<unknown>(null);
   const [sending, setSending] = useState(false);
 
+  function handleNameChange(value: string) {
+  setName(value);
+  setFieldError(undefined);
+  setApiError(null);
+}
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setApiError(null);
@@ -112,7 +118,7 @@ function AddMachineForm({ onCreated }: { onCreated: (m: MachineWithKey) => void 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex-1">
           <Field id="machine-name" label={t("machines.name")} hint={t("machines.nameHint")} maxLength={100}
-            value={name} onChange={(e) => setName(e.target.value)} error={fieldError} />
+            value={name} onChange={(e) => handleNameChange(e.target.value)} error={fieldError} />
         </div>
         <Button type="submit" disabled={sending} className="sm:mt-6">
           {sending ? t("machines.adding") : t("machines.add")}

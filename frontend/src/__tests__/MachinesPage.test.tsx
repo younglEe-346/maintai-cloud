@@ -209,4 +209,22 @@ describe("MachinesPage", () => {
 
     expect(container.querySelector('[data-testid="new-key-dialog"]')).toBeNull();
   });
+    it("efface l'erreur lorsque l'utilisateur corrige le nom", async () => {
+    render(<MachinesPage />);
+
+    const name = await screen.findByLabelText("machines.name");
+    const form = name.closest("form");
+
+    if (!form) throw new Error("Formulaire introuvable");
+
+    fireEvent.submit(form);
+
+    expect(await screen.findByText("valid.required")).toBeTruthy();
+
+    fireEvent.change(name, {
+      target: { value: "Nouvelle machine" },
+    });
+
+    expect(screen.queryByText("valid.required")).toBeNull();
+  });
 });

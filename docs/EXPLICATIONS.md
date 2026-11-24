@@ -1101,6 +1101,20 @@ s'arrête au lieu de prendre un autre port que l'API refuserait.
   seule du membre, changement de rôle, retrait, annulation d'une invitation, lien déjà
   utilisé ; écran du super-administrateur (workers, usines, changement de plan) ; mode
   sombre et mode clair sur tous les écrans.
+  
+**Tests automatisés du front-end.**
+
+Les tests de l'interface React sont regroupés dans `frontend/src/__tests__/`. Ils utilisent Vitest et React Testing Library pour vérifier le comportement des composants et des pages.
+
+Depuis le dossier `frontend/`, après l'installation des dépendances (`npm install`), trois commandes permettent de vérifier le front-end :
+
+```bash
+npm test              # exécute les tests automatisés avec Vitest
+npm run typecheck     # vérifie les types TypeScript
+npm run build         # vérifie TypeScript puis génère la version de production
+```
+
+Avant de proposer une modification, il est recommandé d'exécuter ces trois commandes. Les tests Python du back-end restent indépendants et se lancent séparément avec `pytest`.
 
 ### 12 bis.7 Fichiers
 | Fichier | Rôle |

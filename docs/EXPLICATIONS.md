@@ -364,6 +364,12 @@ ni retiré : une usine a toujours un propriétaire.)
   qu'elle existe).
 - **Mots de passe** hachés avec **bcrypt** (lent exprès : difficile à casser), 8
   caractères minimum.
+- **Limite de tentatives de connexion** : les échecs sont comptés **par e-mail** dans
+  Redis (clé `login_fail:<e-mail>`). Après **5 échecs en 15 minutes**, la connexion répond
+  **429** (« Trop de tentatives, réessayez dans X minutes », en-tête `Retry-After`), même
+  avec le bon mot de passe. Le compteur est vérifié **avant** bcrypt : un compte bloqué ne
+  coûte aucun calcul. Un succès remet le compteur à zéro ; il s'efface seul après 15
+  minutes. Les valeurs sont dans `LOGIN_MAX_FAILURES` et `LOGIN_WINDOW_MINUTES`.
 
 **Invitation, étape par étape :**
 1. `POST /org/invitations {"email", "role"}` : on crée un **jeton aléatoire** de 256 bits.
@@ -1182,6 +1188,7 @@ s'exécutent directement dans le processus de test. Les mesures envoyées sont d
 | Risque | Protection |
 |---|---|
 | Lire les données d'une autre usine | filtre systématique sur l'usine de l'utilisateur ; 404 sur les identifiants d'une autre usine (testé route par route) |
+| Deviner un mot de passe en boucle | **5 échecs en 15 minutes** par e-mail, puis **429** avec `Retry-After` (compteur Redis, testé dans `tests/test_limite_connexion.py`) |
 | Vol de la base | mots de passe **bcrypt** ; clés d'API et jetons d'invitation stockés en **SHA-256** uniquement |
 | Jeton falsifié ou expiré | JWT signé avec `SECRET_KEY`, durée limitée (24 h) ; 401 (testé) |
 | Action non autorisée | rôle vérifié par l'API sur chaque route (403), pas seulement caché dans l'interface |

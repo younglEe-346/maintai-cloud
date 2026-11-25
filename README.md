@@ -90,7 +90,7 @@ Les tests utilisent une base séparée (`maintai_test`) : ils ne touchent jamais
 
 | Route | Rôle |
 |---|---|
-| `POST /auth/register`, `POST /auth/login`, `GET /auth/me` | inscription d'une usine, connexion (JWT) |
+| `POST /auth/register`, `POST /auth/login`, `GET /auth/me` | inscription d'une usine, connexion (JWT) ; après 5 échecs en 15 minutes pour un e-mail, `429` + `Retry-After` |
 | `POST /auth/accept-invitation` | rejoindre une usine par invitation |
 | `POST /mesures` (en-tête `x-api-key`) | lot de mesures d'une machine |
 | `GET/POST /machines`, `POST /machines/{id}/api-key/revoke` et `/rotate` | machines et clés |

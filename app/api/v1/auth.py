@@ -11,6 +11,7 @@ from app.core.security import create_access_token, get_password_hash, hash_token
 from app.db.session import get_db
 from app.models.models import Invitation, Organization, User
 from app.schemas.schemas import Token
+from app.services import login_limit
 
 router = APIRouter()
 
@@ -64,9 +65,13 @@ def register_organization(body: RegisterIn, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Connexion : username = e-mail."""
-    user = db.query(User).filter(User.email == form_data.username.lower()).first()
+    email = form_data.username.strip().lower()
+    login_limit.check_not_blocked(email)  # avant bcrypt : 429 si trop d'échecs récents
+    user = db.query(User).filter(User.email == email).first()
     if not user or not user.is_active or not verify_password(form_data.password, user.password_hash):
+        login_limit.record_failure(email)
         raise HTTPException(status_code=400, detail="E-mail ou mot de passe incorrect")
+    login_limit.reset(email)
     return token_for(user)
 
 

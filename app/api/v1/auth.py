@@ -90,12 +90,13 @@ def invitation_info(token: str, db: Session = Depends(get_db)):
 def accept_invitation(body: AcceptInvitationIn, db: Session = Depends(get_db)):
     inv = find_valid_invitation(body.token, db)
     user = db.query(User).filter(User.email == inv.email).first()
-    if user is not None and (user.is_active or user.org_id != inv.org_id):
+    if user is not None and user.is_active:
         raise HTTPException(status_code=409, detail="Un compte existe déjà avec cet e-mail")
     if user is None:  # cas normal : nouveau compte
         user = User(email=inv.email)
         db.add(user)
-    # (sinon : ancien membre retiré de cette usine, qui revient)
+    # (sinon : ancien membre retiré d'une usine, qui rejoint cette usine ou y revient.
+    #  Même règle que /org/invitations, qui laisse déjà passer un compte désactivé.)
     user.org_id, user.role, user.is_active = inv.org_id, inv.role, True
     user.full_name = body.full_name
     user.password_hash = get_password_hash(body.password)

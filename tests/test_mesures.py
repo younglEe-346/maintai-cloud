@@ -70,6 +70,22 @@ def test_quarantaine_avec_raisons(client):
     assert all(x["reasons"] for x in q)
 
 
+def test_quarantaine_limite_invalide_refusee(client):
+    owner, _ = setup(client)
+    for bad in (-1, 0, 1001):  # avant : limit=-1 faisait répondre 500 par PostgreSQL
+        r = client.get(f"{API}/quarantaine", params={"limit": bad}, headers=owner["headers"])
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_quarantaine_limite_respectee(client):
+    owner, machine = setup(client)
+    rows = [{**ai4i_rows([i])[0], "torque": -3} for i in range(7)]  # 7 mesures rejetées
+    assert len(send(client, machine["api_key"], rows).json()["rejected"]) == 7
+    q5 = client.get(f"{API}/quarantaine", params={"limit": 5}, headers=owner["headers"]).json()
+    assert len(q5) == 5
+    assert len(client.get(f"{API}/quarantaine", headers=owner["headers"]).json()) == 7  # défaut : 100
+
+
 def test_lot_vide_ou_trop_gros(client):
     _, machine = setup(client)
     assert send(client, machine["api_key"], []).status_code == 422

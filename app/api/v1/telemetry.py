@@ -1,7 +1,7 @@
 """Réception des mesures envoyées par les machines (authentification par clé d'API)."""
 from typing import Any, List
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, status
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -113,10 +113,10 @@ def ingest_measures(
 
 
 @router.get("/quarantaine")
-def list_quarantine(limit: int = 100, current_org: Organization = Depends(get_current_org),
+def list_quarantine(limit: int = Query(100, ge=1, le=1000), current_org: Organization = Depends(get_current_org),
                     db: Session = Depends(get_db)):
     """Mesures rejetées de l'usine, avec les raisons du rejet (les plus récentes d'abord)."""
     rows = (db.query(QuarantinedMeasure).filter(QuarantinedMeasure.org_id == current_org.id)
-            .order_by(QuarantinedMeasure.received_at.desc()).limit(min(limit, 1000)).all())
+            .order_by(QuarantinedMeasure.received_at.desc()).limit(limit).all())
     return [{"id": q.id, "machine_id": q.machine_id, "message_id": q.message_id,
              "payload": q.payload, "reasons": q.reasons, "received_at": q.received_at} for q in rows]

@@ -55,6 +55,8 @@ services:
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}   # liens d'invitation : front-end React
+      - LOGIN_MAX_FAILURES=${LOGIN_MAX_FAILURES:-5}
+      - LOGIN_WINDOW_MINUTES=${LOGIN_WINDOW_MINUTES:-15}
       - ORG_MODELS_DIR=/app/org_models
     volumes:
       - ./models:/app/models:ro

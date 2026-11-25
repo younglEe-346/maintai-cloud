@@ -18,6 +18,11 @@ ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://local
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
+# Limite de connexion : après LOGIN_MAX_FAILURES échecs en LOGIN_WINDOW_MINUTES minutes pour un même
+# e-mail, la connexion répond 429 (Redis tient le compteur ; il expire tout seul).
+LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
+LOGIN_WINDOW_MINUTES = int(os.getenv("LOGIN_WINDOW_MINUTES", "15"))
+
 # E-mails (invitations). Sans SMTP_HOST, les e-mails sont seulement écrits dans les logs.
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "1025"))

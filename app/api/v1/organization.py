@@ -94,6 +94,14 @@ def invite(body: InvitationIn, me: User = Depends(require_roles("owner", "admin"
     if existing is not None and existing.is_active:
         raise HTTPException(status_code=409, detail="Un compte existe déjà avec cet e-mail")
 
+    # Une seule invitation valable par e-mail et par usine : les anciennes, encore en attente,
+    # sont annulées (leur lien répond alors 404). Même transaction que la nouvelle invitation.
+    now = datetime.utcnow()
+    db.query(Invitation).filter(
+        Invitation.org_id == org.id, Invitation.email == email,
+        Invitation.accepted_at.is_(None), Invitation.revoked_at.is_(None),
+    ).update({Invitation.revoked_at: now}, synchronize_session=False)
+
     token = secrets.token_urlsafe(32)  # envoyé par e-mail, jamais stocké en clair
     inv = Invitation(org_id=org.id, email=email, role=body.role, token_hash=hash_token(token),
                      invited_by_user_id=me.id,

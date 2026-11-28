@@ -25,7 +25,9 @@ from app.ml.registry import next_version, save_artifact
 
 TARGET = "Machine failure"
 MODES = ["TWF", "HDF", "PWF", "OSF", "RNF"]
-UCI_ANNOUNCED = {"TWF": 120, "RNF": 5}  # chiffres de la page UCI cités dans le sujet
+# Chiffres de la page UCI cités dans le sujet. Pour TWF, la page précise que 120 compte
+# les fins de vie de l'outil : 69 remplacements + 51 casses (seules les casses sont des pannes).
+UCI_ANNOUNCED = {"TWF": 120, "RNF": 5}
 
 
 def fmt(c: dict) -> str:

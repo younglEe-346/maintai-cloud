@@ -66,14 +66,25 @@ constate dans le fichier :
 - 9 pannes n'ont aucun mode renseigné ;
 - 24 lignes ont plusieurs modes à la fois.
 
-Explication probable (**à vérifier sur la page UCI avant la soutenance**, nous n'avons
-pas pu la consulter) : le « 120 » TWF compterait les moments où l'outil arrive en fin
-de vie (remplacé ou cassé), et non les pannes ; seule une partie de ces événements
-sont des pannes, d'où 46. Pour RNF, le fichier publié marque 19 lignes mais n'en
-compte qu'une seule comme panne : les étiquettes du fichier ne sont donc pas
-parfaitement cohérentes avec la description. **Conséquence pour nous** : on prend la
-colonne `Machine failure` comme vérité pour le risque, et on garde les modes tels
-qu'ils sont dans le fichier.
+Ce que dit la page UCI (vérifié le 8 novembre 2026 sur
+https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) :
+- **TWF** : « the tool will be replaced of fail at a randomly selected tool wear time
+  between 200 – 240 mins (120 times in our dataset). At this point in time, the tool
+  is replaced 69 times, and fails 51 times ». Le « 120 » compte donc les **fins de
+  vie de l'outil** (69 remplacements + 51 casses), pas les pannes. Seules les casses
+  sont des pannes : la page en annonce 51, le fichier en marque 46 (5 de moins, écart
+  que la page n'explique pas).
+- **RNF** : « each process has a chance of 0,1 % to fail regardless of its process
+  parameters. This is the case for only 5 datapoints ». Le fichier publié marque
+  pourtant 19 lignes RNF, dont une seule avec `Machine failure = 1` : les étiquettes
+  RNF du fichier ne correspondent pas à la description (ni 5, ni 19 pannes).
+- **Machine failure** : « If at least one of the above failure modes is true, the
+  process fails and the 'machine failure' label is set to 1. » Le fichier ne respecte
+  pas toujours cette règle (18 RNF sans panne, 9 pannes sans mode).
+- Les autres modes concordent : HDF 115, PWF 95, OSF 98 sur la page comme dans le fichier.
+
+**Conséquence pour nous** : on prend la colonne `Machine failure` comme vérité pour le
+risque, et on garde les modes tels qu'ils sont dans le fichier.
 
 ### 1.3 Comment ça fonctionne
 
@@ -1276,10 +1287,12 @@ pas l'instant exact.
 
 **8. Expliquez l'écart avec la page UCI (120 TWF et 5 RNF annoncés ; 46 et 19 mesurés).**
 Faits mesurés : les 46 TWF sont des pannes ; 18 des 19 RNF ont `Machine failure = 0` ;
-9 pannes n'ont aucun mode. Explication probable (à confirmer sur la page UCI) : 120 compte
-les fins de vie d'outil (remplacé **ou** cassé), pas seulement les pannes ; et les
-étiquettes RNF du fichier publié ne sont pas cohérentes avec la colonne de panne. Nous
-prenons `Machine failure` comme vérité pour le risque.
+9 pannes n'ont aucun mode. La page UCI le dit elle-même : les 120 TWF sont les fins de
+vie de l'outil, « replaced 69 times, and fails 51 times » ; seules les 51 casses sont des
+pannes (46 dans le fichier). Pour RNF, la page annonce 5 pannes aléatoires, alors que le
+fichier publié marque 19 lignes RNF dont une seule en panne : les étiquettes du fichier
+ne sont pas cohérentes avec la description. Nous prenons `Machine failure` comme vérité
+pour le risque.
 
 **9. Comment est versionné le modèle ?**
 Chaque entraînement crée `risk_model_vN.joblib` (jamais écrasé) et un rapport JSON
@@ -1375,8 +1388,6 @@ du réentraînement biaisée par AI4I, pas de test de charge à 1 million de mes
 du sujet (tableau 13.2), dont l'isolation entre usines route par route.
 
 ### Ce qui reste à faire ou à améliorer
-- **Vérifier sur la page UCI** la formulation exacte des 120 TWF et 5 RNF (page
-  inaccessible pendant le projet) avant de l'écrire dans le rapport.
 - **Paiement** : le changement de plan est simulé (pas de prestataire de paiement).
 - **Colonne `Type` (L/M/H)** non utilisée, car les machines ne l'envoient pas ; l'ajouter
   pourrait améliorer les pannes de surcharge (OSF).
@@ -1386,6 +1397,6 @@ du sujet (tableau 13.2), dont l'isolation entre usines route par route.
   32 prédictions par mesure (à surveiller, plusieurs workers si besoin).
 - **Comptes** : pas de réinitialisation de mot de passe ni de vérification de l'e-mail à
   l'inscription ; pas de HTTPS (à mettre derrière un proxy en production).
-- **Git** : le travail est sur la branche `feature/ia-modele`, à fusionner dans `main` et
-  à pousser sur GitHub ; l'auteur des commits est « Your Name » (à corriger avec
-  `git config user.name`).
+- **Git** : tout le travail est fusionné dans `main` et poussé sur GitHub. Les premiers
+  commits portent l'auteur par défaut « Your Name » : à réattribuer aux membres de
+  l'équipe.
